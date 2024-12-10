@@ -1,17 +1,11 @@
 #include <iostream>
 
-#include "../code/thread_pool/thread_pool.h"
+#include "../code/test/test.h"
 
-void foo(int a);
 
 int main(int argc, char** args)
 {
-    thread_pool pool;
+    test_1();
 
     return 0;
-}
-
-void foo(int a)
-{
-    //
 }

@@ -4,6 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <map>
 #include <queue>
 #include <string>
 #include <vector>
@@ -29,82 +30,54 @@ using _EnableJobsFromContainer_t =
             bool>;
 
 
-enum class priority
+enum class job_priority
 {
     lowest,
     low,
     normal,
     high,
     highest
-};  // END priority
+};  // END job_priority
 
 
 class thread_pool
 {
 private:
-    class priority_job
+    enum class pool_status
     {
-    private:
-        std::function<void(void)>   _job;
-        priority                    _prio;
-
-    public:
-
-        priority_job() = default;
-
-        ~priority_job() = default;
-
-        priority_job(std::function<void(void)>&& job, priority prio)
-            : _job(std::move(job)), _prio(prio) { /* Empty */ }
-
-        priority_job(const priority_job&) = default;
-        priority_job(priority_job&&) = default;
-
-        priority_job& operator=(const priority_job&) = default;
-        priority_job& operator=(priority_job&&) = default;
-
-    public:
-
-        void operator()() const
-        {
-            if (_job)
-                _job();
-        }
-
-        friend bool operator<(const priority_job& left, const priority_job& right)
-        {
-            return left._prio < right._prio;
-        }
-    };  // END priority_job
+        working,
+        idle,
+        shutdown
+    };  // END pool_status
 
 private:
-    std::priority_queue<priority_job>       _jobQ;
-    std::vector<std::thread>                _workerThreads;
-    std::mutex                              _poolMtx;
-    std::condition_variable                 _poolCV;
+    std::multimap<job_priority, std::function<void(void)>>  _jobQueue;
+    std::vector<std::thread>                                _workerThreads;
+    std::mutex                                              _poolMtx;
+    std::condition_variable                                 _poolCV;
 
-    std::atomic_size_t                      _jobsDone;
-    bool                                    _shutdown;
+    std::atomic_size_t                                      _jobsDone;
+    pool_status                                             _status;
 
-    std::queue<std::string>                 _errors;
-    std::mutex                              _errorMtx;
+    std::queue<std::string>                                 _errors;
+    std::mutex                                              _errorMtx;
 
 public:
     // Constructors & Operators
 
     thread_pool()
     {
-        _open_pool(std::thread::hardware_concurrency());
+        restart(std::thread::hardware_concurrency());
     }
 
     thread_pool(const size_t nthreads)
     {
-        _open_pool(nthreads);
+        restart(nthreads);
     }
 
     ~thread_pool()
     {
-        _close_pool();
+        shutdown();
     }
 
     thread_pool(const thread_pool& other)             = delete;
@@ -118,62 +91,18 @@ public:
         return _workerThreads.size();
     }
 
-    void increase_thread_count(const size_t nthreads)
-    {
-        for (size_t i = 0; i < nthreads; ++i)
-        {
-            std::thread t = std::thread(std::bind(&thread_pool::_worker_thread, this));
-            _workerThreads.push_back(std::move(t));
-        }
-    }
-
     size_t jobs_done() const
     {
         return _jobsDone;
     }
 
-    void do_job(std::function<void(void)>&& newJob, priority prio = priority::normal)
-    {
-        // Move a job on the queue and unblock a thread
-        std::unique_lock<std::mutex> lock(_poolMtx);
-
-        _jobQ.emplace(std::move(newJob), prio);
-        _poolCV.notify_one();
-    }
-
-    template<class JobContainer, _EnableJobsFromContainer_t<JobContainer> = true>
-    void do_more_jobs(JobContainer&& newJobs, priority prioAll = priority::normal)
-    {
-        // Move multiple jobs on the queue and unblock necessary threads
-        std::unique_lock<std::mutex> lock(_poolMtx);
-
-        for (auto&& job : newJobs)
-        {
-            _jobQ.emplace(std::move(job), prioAll);
-            _poolCV.notify_one();
-        }
-    }
-
-private:
-    // Helpers
-
-    void _open_pool(const size_t nthreads)
-    {
-        // Worker threads can be created without lock
-
-        _jobsDone = 0;
-        _shutdown = false;
-
-        increase_thread_count(nthreads);
-    }
-
-    void _close_pool()
+    void restart(const size_t nthreads)
     {
         // Notify all threads to stop waiting for job
         {
             std::unique_lock<std::mutex> lock(_poolMtx);
 
-            _shutdown = true;
+            _status = pool_status::idle;
             _poolCV.notify_all();
         }
 
@@ -181,17 +110,62 @@ private:
         for (auto& t : _workerThreads)
             t.join();
 
-        // Print errors last
-        while(!_errors.empty())
+        _workerThreads.clear();
+
+        // Restart work
+        _status = pool_status::working;
+
+        for (size_t i = 0; i < nthreads; ++i)
         {
-            std::cout << "Error: " << _errors.front() << '\n';
-            _errors.pop();
+            std::thread t = std::thread(std::bind(&thread_pool::_worker_thread, this));
+            _workerThreads.push_back(std::move(t));
         }
     }
 
+    void shutdown()
+    {
+        // Notify all threads to stop waiting for job
+        {
+            std::unique_lock<std::mutex> lock(_poolMtx);
+
+            _status = pool_status::shutdown;
+            _poolCV.notify_all();
+        }
+
+        // Threads will exit the loop and will join here
+        for (auto& t : _workerThreads)
+            t.join();
+
+        _workerThreads.clear();
+    }
+
+    void do_job(std::function<void(void)>&& newJob, job_priority prio = job_priority::normal)
+    {
+        // Move a job on the queue and unblock a thread
+        std::unique_lock<std::mutex> lock(_poolMtx);
+
+        _jobQueue.emplace(prio, std::move(newJob));
+        _poolCV.notify_one();
+    }
+
+    template<class JobContainer, _EnableJobsFromContainer_t<JobContainer> = true>
+    void do_more_jobs(JobContainer&& newJobs, job_priority prio = job_priority::normal)
+    {
+        // Move multiple jobs on the queue and unblock necessary threads
+        std::unique_lock<std::mutex> lock(_poolMtx);
+
+        for (auto&& job : newJobs)
+            _jobQueue.emplace(prio, std::move(job));
+
+        _poolCV.notify_all();
+    }
+
+private:
+    // Helpers
+
     void _worker_thread()
     {
-        priority_job job;
+        std::function<void(void)> job;
 
         for (;;)
         {
@@ -199,17 +173,22 @@ private:
                 std::unique_lock<std::mutex> lock(_poolMtx);
 
                 // If the pool is still working, but there are no jobs -> wait
-                // Safeguard against spurious wakeups
-                while (!_shutdown && _jobQ.empty())
+                // Safeguard against spurious wakeups (while instead of if)
+                while (_status == pool_status::working && _jobQueue.empty())
                     _poolCV.wait(lock);
 
-                // True only when the pool is closed -> exit loop and this thread is joined in _close_pool
-                if (_jobQ.empty())
+                // Pool is closed. Threads will be replaced and jobs will continue later
+                if (_status == pool_status::idle)
+                    return;
+
+                // Pool is closed. Threads finish jobs
+                if (_status == pool_status::shutdown && _jobQueue.empty())
                     return;
 
                 // Assign job to thread from queue
-                job = std::move(_jobQ.top());
-                _jobQ.pop();
+                auto it = _jobQueue.begin();
+                job = std::move((*it).second);
+                _jobQueue.erase(it);
             }   // empty scope end -> unlock, can start job
 
 
