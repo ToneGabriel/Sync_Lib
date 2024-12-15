@@ -25,19 +25,19 @@ enum class job_priority
 class thread_pool
 {
 private:
-    std::multimap<job_priority, std::function<void(void)>>  _validJobQueue;     // Queue from where the jobs are assigned to workers
-    std::multimap<job_priority, std::function<void(void)>>  _idleJobQueue;      // Queue used when paused
+    std::multimap<  job_priority,
+                    std::function<void(void)>>  _priorityJobQueue;
 
-    std::vector<std::thread>            _workerThreads;                         // Actual workers
-    std::mutex                          _poolMtx;                               // Mutex for job assign and control
-    std::condition_variable             _poolCV;                                // CV for job assign and control
+    std::vector<std::thread>                    _workerThreads;         // Managed worker threads
+    std::mutex                                  _poolMtx;               // Mutex for job assign and control
+    std::condition_variable                     _poolCV;                // CV for job assign and control
 
-    std::atomic_size_t                  _jobsDone   = 0;                        // Counts jobs done until destroyed
-    bool                                _shutdown   = false;                    // Control shutdown
-    bool                                _paused     = false;                    // Control pause
+    std::atomic_size_t                          _jobsDone   = 0;        // Counts jobs done until destroyed
+    bool                                        _shutdown   = false;    // Control shutdown
+    bool                                        _paused     = false;    // Control pause
 
-    std::vector<std::exception_ptr>     _exceptions;                            // Buffer for exceptions
-    std::mutex                          _exceptionsMtx;                         // Mutex for exception buffer
+    std::vector<std::exception_ptr>             _exceptions;            // Buffer for exceptions
+    std::mutex                                  _exceptionsMtx;         // Mutex for exception buffer
 
 public:
     // Constructors & Operators
@@ -60,8 +60,8 @@ public:
         (void)shutdown();
     }
 
-    thread_pool(const thread_pool& other)             = delete;
-    thread_pool& operator=(const thread_pool& other)  = delete;
+    thread_pool(const thread_pool&)             = delete;
+    thread_pool& operator=(const thread_pool&)  = delete;
 
 public:
     // Main functions
@@ -82,55 +82,34 @@ public:
     {
         std::lock_guard lock(_poolMtx);
 
-        if (_paused)
-            _idleJobQueue.clear();
-
-        _validJobQueue.clear();
+        _priorityJobQueue.clear();
     }
 
-    // Stop the execution by swapping job queue with and empty queue
-    // Worker threads wait until job queue has entries again
+    // Worker threads wait until resume
     void pause()
     {
         std::lock_guard lock(_poolMtx);
 
-        if (!_paused && !_shutdown)
-        {
-            _paused = true;
-            std::swap(_validJobQueue, _idleJobQueue);
-        }
-        else
-        {
-            // do nothing - pool is already paused or shutdown
-        }
+        _paused = true;
     }
 
-    // Resume the execution by swapping the empty queue with the original job queue
+    // Resume the execution
     // Worker threads are notified and can now get jobs
-    void resume()   // has valid jobs again -> the worker can start
+    void resume()
     {
         std::lock_guard lock(_poolMtx);
 
-        if (_paused && !_shutdown)
-        {
-            _paused = false;
-            std::swap(_validJobQueue, _idleJobQueue);
-            _poolCV.notify_all();
-        }
-        else
-        {
-            // do nothing - pool is already working or shutdown
-        }
+        _paused = false;
+        _poolCV.notify_all();
     }
 
-    // Stop the execution and moves remaining jobs to idle queue
-    // Clear thread vector and repopulate it with a new thread count
-    // Start threads and move back the original job queue
+    // Pause, refresh the thread vector with new thread count, resume
+    // Return caught exceptions
     std::vector<std::exception_ptr> restart(const size_t nthreads)
     {
         std::vector<std::exception_ptr> ret;
 
-        pause();    // no valid jobs
+        pause();
 
         _close_pool();  // threads join after running jobs are done
 
@@ -138,7 +117,7 @@ public:
 
         _open_pool(nthreads);   // new threads are created and started
 
-        resume();   // valid jobs are back
+        resume();
 
         return ret;
     }
@@ -149,7 +128,7 @@ public:
     {
         std::vector<std::exception_ptr> ret;
 
-        resume();   // ensure the jobs are ALL valid
+        resume();   // ensure the pool is not paused
 
         _close_pool();  // threads join after ALL jobs are done
 
@@ -165,7 +144,7 @@ public:
     {
         std::vector<std::exception_ptr> ret;
 
-        pause();    // no valid jobs
+        pause();
 
         _close_pool();  // threads join after running jobs are done
 
@@ -184,14 +163,9 @@ public:
         if (_shutdown)
             return;
 
-        // Can accept jobs
-        if (_paused)
-            _idleJobQueue.emplace(prio, std::move(newJob));
-        else
-        {
-            _validJobQueue.emplace(prio, std::move(newJob));
-            _poolCV.notify_one();
-        }
+        // Can accept jobs (even if paused)
+        _priorityJobQueue.emplace(prio, std::move(newJob));
+        _poolCV.notify_one();
     }
 
 private:
@@ -211,7 +185,7 @@ private:
         }
     }
 
-    // Destroy threads after jobs in valid queue are done
+    // Signal threads the pool is closed, then join
     void _close_pool()
     {
         // Notify all threads to stop waiting for job
@@ -226,6 +200,7 @@ private:
         for (auto& t : _workerThreads)
             t.join();
 
+        // Destroy thread objects
         _workerThreads.clear();
     }
 
@@ -239,21 +214,21 @@ private:
             {   // Empty scope start -> mutex lock and job decision
                 std::unique_lock<std::mutex> lock(_poolMtx);
 
-                // Pool is working, but there are no jobs -> wait
+                // Pool is working, but it's paused or there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
-                while (!_shutdown && _validJobQueue.empty())
+                while (!_shutdown && (_paused || _priorityJobQueue.empty()))
                     _poolCV.wait(lock);
 
                 // Pool is closed
-                // Threads finish jobs first
-                if (_validJobQueue.empty())
+                // Threads finish jobs first if not paused
+                if (_paused || _priorityJobQueue.empty())
                     return;
 
-                // Pool is working/closed and jobs are available
+                // Pool is working/closed, not paused and jobs are available
                 // Assign job to thread from queue
-                auto it = _validJobQueue.begin();
+                auto it = _priorityJobQueue.begin();
                 job = std::move(it->second);
-                _validJobQueue.erase(it);
+                _priorityJobQueue.erase(it);
             }   // Empty scope end -> unlock, can start job
 
 
