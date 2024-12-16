@@ -4,6 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <atomic>
+#include <future>
 #include <map>
 #include <vector>
 #include <utility>
@@ -29,15 +30,12 @@ private:
                     std::function<void(void)>>  _priorityJobQueue;
 
     std::vector<std::thread>                    _workerThreads;         // Managed worker threads
-    std::mutex                                  _poolMtx;               // Mutex for job assign and control
-    std::condition_variable                     _poolCV;                // CV for job assign and control
+    mutable std::mutex                          _poolMtx;               // Mutex for job assign and control
+    mutable std::condition_variable             _poolCV;                // CV for job assign and control
 
     std::atomic_size_t                          _jobsDone   = 0;        // Counts jobs done until destroyed
     bool                                        _shutdown   = false;    // Control shutdown
     bool                                        _paused     = false;    // Control pause
-
-    std::vector<std::exception_ptr>             _exceptions;            // Buffer for exceptions
-    std::mutex                                  _exceptionsMtx;         // Mutex for exception buffer
 
 public:
     // Constructors & Operators
@@ -78,6 +76,13 @@ public:
         return _jobsDone;
     }
 
+    size_t pending_jobs() const
+    {
+        std::lock_guard lock(_poolMtx);
+
+        return _priorityJobQueue.size();   
+    }
+
     void clear_pending_jobs()
     {
         std::lock_guard lock(_poolMtx);
@@ -103,69 +108,56 @@ public:
         _poolCV.notify_all();
     }
 
-    // Pause, refresh the thread vector with new thread count, resume
-    // Return caught exceptions
-    std::vector<std::exception_ptr> restart(const size_t nthreads)
+    // Pause, close pool and reopen with new number of threads, resume
+    void restart(const size_t nthreads)
     {
-        std::vector<std::exception_ptr> ret;
-
         pause();
 
         _close_pool();  // threads join after running jobs are done
-
-        std::swap(_exceptions, ret);
 
         _open_pool(nthreads);   // new threads are created and started
 
         resume();
-
-        return ret;
     }
 
     // Destroy threads, but NOT before finishing ALL jobs
-    // Return caught exceptions
-    std::vector<std::exception_ptr> shutdown()
+    void shutdown()
     {
-        std::vector<std::exception_ptr> ret;
-
         resume();   // ensure the pool is not paused
 
         _close_pool();  // threads join after ALL jobs are done
-
-        std::swap(_exceptions, ret);
-
-        return ret;
     }
 
     // Destroy threads after finishing running jobs
-    // Return caught exceptions
     // NOTE: If the pool is destroyed after a forced shutdown, the remaining jobs will be lost
-    std::vector<std::exception_ptr> force_shutdown()
+    void force_shutdown()
     {
-        std::vector<std::exception_ptr> ret;
-
         pause();
 
         _close_pool();  // threads join after running jobs are done
-
-        std::swap(_exceptions, ret);
-
-        return ret;
     }
 
     // Assign new job with priority
-    void do_job(std::function<void(void)>&& newJob, job_priority prio = job_priority::normal)
+    template<class Functor, class... Args>
+    std::future<std::invoke_result_t<Functor, Args...>> do_job( job_priority prio,
+                                                                Functor&& func,
+                                                                Args&&... args)
     {
-        // Move a job on the queue and unblock a thread
-        std::lock_guard lock(_poolMtx);
+        using ReturnType = std::invoke_result_t<Functor, Args...>;
 
-        // No longer accepting jobs
-        if (_shutdown)
-            return;
+        // Create a packaged_task for the job
+        auto safeJobPtr = std::make_shared<std::packaged_task<ReturnType()>>(
+        std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
 
-        // Can accept jobs (even if paused)
-        _priorityJobQueue.emplace(prio, std::move(newJob));
-        _poolCV.notify_one();
+        // Move it on the queue (wrapped in a lambda) and unblock a thread
+        {
+            std::lock_guard lock(_poolMtx);
+
+            _priorityJobQueue.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+            _poolCV.notify_one();
+        }
+
+        return safeJobPtr->get_future();
     }
 
 private:
@@ -231,24 +223,8 @@ private:
                 _priorityJobQueue.erase(it);
             }   // Empty scope end -> unlock, can start job
 
-
             // Do the job without holding any locks
-            // Store exceptions
-            try
-            {
-                job();
-            }
-            catch (const std::exception&)   // Standard handle
-            {
-                std::lock_guard lock(_exceptionsMtx);
-                _exceptions.push_back(std::current_exception());
-            }
-            catch (...) // Convert unknown exception to a standard exception
-            {
-                std::lock_guard lock(_exceptionsMtx);
-                std::runtime_error e("Job threw an unknown exception");
-                _exceptions.push_back(std::make_exception_ptr(e));
-            }
+            job();
 
             // Count work done (even if throws)
             ++_jobsDone;

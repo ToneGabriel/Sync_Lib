@@ -39,27 +39,27 @@ void test_1()
 {
     thread_pool pool(1);
 
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::highest);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::highest, foo_2);
 }
 
 void test_2()
 {
     thread_pool pool;
 
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::highest);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::low);
-    pool.do_job(foo_2, job_priority::normal);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_2, job_priority::high);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::highest, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::low, foo_2);
+    pool.do_job(job_priority::normal, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::high, foo_2);
 }
 
 void test_3()
@@ -67,18 +67,18 @@ void test_3()
     thread_pool pool(2);
     std::cout << "Pool has " << pool.thread_count() << " threads\n";
 
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::highest);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::low);
-    pool.do_job(foo_2, job_priority::normal);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_2, job_priority::high);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::highest, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::low, foo_2);
+    pool.do_job(job_priority::normal, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::high, foo_2);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     pool.restart(5);
@@ -89,22 +89,22 @@ void test_4()
 {
     thread_pool pool(2);
 
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::highest);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::low);
-    pool.do_job(foo_2, job_priority::normal);
-    pool.do_job(foo_1);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::highest, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::low, foo_2);
+    pool.do_job(job_priority::normal, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
     
     std::cout << "Pool paused\n";
     pool.pause();
 
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_2, job_priority::high);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::high, foo_2);
 
     std::this_thread::sleep_for(std::chrono::seconds(5));
 
@@ -120,68 +120,40 @@ void test_5()
 {
     thread_pool pool(2);
 
-    pool.do_job(foo_3_except_nok);
-    pool.do_job(foo_3_except_ok, job_priority::high);
-    pool.do_job(foo_3_except_nok, job_priority::highest);
-    pool.do_job(foo_3_except_ok);
-    pool.do_job(foo_3_except_nok, job_priority::low);
-    pool.do_job(foo_3_except_ok, job_priority::normal);
-    pool.do_job(foo_3_except_nok);
-    pool.do_job(foo_3_except_nok, job_priority::high);
-    pool.do_job(foo_3_except_ok, job_priority::lowest);
-    pool.do_job(foo_3_except_nok);
-    pool.do_job(foo_3_except_nok, job_priority::lowest);
-    pool.do_job(foo_3_except_ok, job_priority::high);
+    pool.do_job(job_priority::normal, foo_3_except_nok);
+    pool.do_job(job_priority::high, foo_3_except_ok);
+    pool.do_job(job_priority::highest, foo_3_except_nok);
+    pool.do_job(job_priority::normal, foo_3_except_ok);
+    pool.do_job(job_priority::low, foo_3_except_nok);
+    pool.do_job(job_priority::normal, foo_3_except_ok);
+    pool.do_job(job_priority::normal, foo_3_except_nok);
+    pool.do_job(job_priority::high, foo_3_except_nok);
+    pool.do_job(job_priority::lowest, foo_3_except_ok);
+    pool.do_job(job_priority::normal, foo_3_except_nok);
+    pool.do_job(job_priority::lowest, foo_3_except_nok);
+    pool.do_job(job_priority::high, foo_3_except_ok);
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
-    auto exceptions = pool.force_shutdown();
+    pool.force_shutdown();
 
     std::cout << "Pool shutdown with finished jobs " << pool.jobs_done() << '\n';
-
-    for (auto& e : exceptions)
-    {
-        try
-        {
-            std::rethrow_exception(e);
-        }
-        catch (const std::exception& re)
-        {
-            std::cout << re.what() << '\n';
-        }
-    }
-
-
 
     pool.restart(5);
     std::cout << "Pool restarted\n";
 
-    pool.do_job(foo_1);
-    pool.do_job(foo_2, job_priority::high);
-    pool.do_job(foo_1, job_priority::highest);
-    pool.do_job(foo_2);
-    pool.do_job(foo_2, job_priority::low);
-    pool.do_job(foo_1, job_priority::normal);
-    pool.do_job(foo_2);
-    pool.do_job(foo_1, job_priority::high);
-    pool.do_job(foo_1, job_priority::lowest);
-    pool.do_job(foo_2);
-    pool.do_job(foo_2, job_priority::lowest);
-    pool.do_job(foo_1, job_priority::high);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::high, foo_2);
+    pool.do_job(job_priority::highest, foo_1);
+    pool.do_job(job_priority::normal, foo_2);
+    pool.do_job(job_priority::low, foo_2);
+    pool.do_job(job_priority::normal, foo_1);
+    pool.do_job(job_priority::normal, foo_2);
+    pool.do_job(job_priority::high, foo_1);
+    pool.do_job(job_priority::lowest, foo_1);
+    pool.do_job(job_priority::normal, foo_2);
+    pool.do_job(job_priority::lowest, foo_2);
+    pool.do_job(job_priority::high, foo_1);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    exceptions = pool.force_shutdown();
-
-    std::cout << "Pool shutdown with finished jobs " << pool.jobs_done() << '\n';
-
-    for (auto& e : exceptions)
-    {
-        try
-        {
-            std::rethrow_exception(e);
-        }
-        catch (const std::exception& re)
-        {
-            std::cout << re.what() << '\n';
-        }
-    }
+    pool.force_shutdown();
 }
