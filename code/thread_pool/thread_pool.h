@@ -13,6 +13,11 @@
 #include "_Core.h"
 
 
+/**
+ * @brief Enum for thread_pool task priority management
+ * @see thread_pool
+ * @see thread_pool::do_job()
+ */
 enum class job_priority
 {
     highest,
@@ -23,59 +28,78 @@ enum class job_priority
 };  // END job_priority
 
 
+/**
+ * @brief Class that manages multiple tasks in an ordered and threadsafe manner
+ */
 class thread_pool
 {
 private:
     std::multimap<  job_priority,
-                    std::function<void(void)>>  _priorityJobQueue;
-
-    std::vector<std::thread>                    _workerThreads;         // Managed worker threads
-    mutable std::mutex                          _poolMtx;               // Mutex for job assign and control
-    mutable std::condition_variable             _poolCV;                // CV for job assign and control
+                    std::function<void(void)>>  _priorityJobQueue;      // Priority queue for jobs
+    std::vector<std::thread>                    _workerThreads;         // Dynamic container for threads
+    mutable std::mutex                          _poolMtx;               // Thread safety mutex of this pool
+    mutable std::condition_variable             _poolCV;                // CV for job start notification
 
     std::atomic_size_t                          _jobsDone   = 0;        // Counts jobs done until destroyed
-    bool                                        _shutdown   = false;    // Control shutdown
-    bool                                        _paused     = false;    // Control pause
+    bool                                        _shutdown   = false;    // Shutdown flag
+    bool                                        _paused     = false;    // Pause flag
 
 public:
     // Constructors & Operators
 
-    // Open pool with default number of threads
+    /**
+     * @brief Construct a new thread pool object with default number of threads
+     */
     thread_pool()
     {
-        (void)restart(std::thread::hardware_concurrency());
+        restart(std::thread::hardware_concurrency());
     }
 
-    // Open pool with given number of threads
+    /**
+     * @brief Construct a new thread pool object with given number of threads
+     * @param nthreads given number of threads
+     */
     thread_pool(const size_t nthreads)
     {
-        (void)restart(nthreads);
+        restart(nthreads);
     }
 
-    // Destroy pool after ALL jobs are done
+    /**
+     * @brief Destroy the thread pool object after ALL jobs are done
+     */
     ~thread_pool()
     {
-        (void)shutdown();
+        shutdown();
     }
 
     thread_pool(const thread_pool&)             = delete;
+    thread_pool(thread_pool&&)                  = delete;
+
     thread_pool& operator=(const thread_pool&)  = delete;
+    thread_pool& operator=(thread_pool&&)       = delete;
 
 public:
     // Main functions
 
-    // Get current thread number
+    /**
+     * @brief Get the number of running threads
+     */
     size_t thread_count() const
     {
         return _workerThreads.size();
     }
 
-    // Get jobs finished
+    /**
+     * @brief Get the number of executed tasks
+     */
     size_t jobs_done() const
     {
         return _jobsDone;
     }
 
+    /**
+     * @brief Get the number of jobs waiting in queue
+     */
     size_t pending_jobs() const
     {
         std::lock_guard lock(_poolMtx);
@@ -83,6 +107,9 @@ public:
         return _priorityJobQueue.size();   
     }
 
+    /**
+     * @brief Remove ALL jobs from queue
+     */
     void clear_pending_jobs()
     {
         std::lock_guard lock(_poolMtx);
@@ -90,7 +117,19 @@ public:
         _priorityJobQueue.clear();
     }
 
-    // Worker threads wait until resume
+    /**
+     * @brief Get the pause state of the pool
+     */
+    bool is_paused() const
+    {
+        std::lock_guard lock(_poolMtx);
+
+        return _paused;
+    }
+
+    /**
+     * @brief Worker threads wait until resume or shutdown
+     */
     void pause()
     {
         std::lock_guard lock(_poolMtx);
@@ -98,8 +137,9 @@ public:
         _paused = true;
     }
 
-    // Resume the execution
-    // Worker threads are notified and can now get jobs
+    /**
+     * @brief Resume the execution after pause
+     */
     void resume()
     {
         std::lock_guard lock(_poolMtx);
@@ -108,7 +148,10 @@ public:
         _poolCV.notify_all();
     }
 
-    // Pause, close pool and reopen with new number of threads, resume
+    /**
+     * @brief Pause, close pool and reopen with new number of threads, resume
+     * @param nthreads new number of threads
+     */
     void restart(const size_t nthreads)
     {
         pause();
@@ -120,7 +163,9 @@ public:
         resume();
     }
 
-    // Destroy threads, but NOT before finishing ALL jobs
+    /**
+     * @brief Destroy threads, but NOT before finishing ALL jobs
+     */
     void shutdown()
     {
         resume();   // ensure the pool is not paused
@@ -128,8 +173,10 @@ public:
         _close_pool();  // threads join after ALL jobs are done
     }
 
-    // Destroy threads after finishing running jobs
-    // NOTE: If the pool is destroyed after a forced shutdown, the remaining jobs will be lost
+    /**
+     * @brief Destroy threads after finishing running jobs
+     * @note If the pool is destroyed after a forced shutdown, the remaining jobs will be lost
+     */
     void force_shutdown()
     {
         pause();
@@ -137,7 +184,15 @@ public:
         _close_pool();  // threads join after running jobs are done
     }
 
-    // Assign new job with priority
+    /**
+     * @brief Assign new job with priority
+     * @tparam Functor type of the function object
+     * @tparam Args types of the arguments of the function object
+     * @param prio priority in queue
+     * @param func function object to be called
+     * @param args arguments for the call
+     * @return A future to be used later to wait for the function to finish executing and obtain its returned value if it has one
+     */
     template<class Functor, class... Args>
     std::future<std::invoke_result_t<Functor, Args...>> do_job( job_priority prio,
                                                                 Functor&& func,
@@ -163,7 +218,10 @@ public:
 private:
     // Helpers
 
-    // Create a number of threads
+    /**
+     * @brief Create a number of threads
+     * @param nthreads threads to create
+     */
     void _open_pool(const size_t nthreads)
     {
         _ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
@@ -177,7 +235,9 @@ private:
         }
     }
 
-    // Signal threads the pool is closed, then join
+    /**
+     * @brief Signal threads the pool is closed, then join
+     */
     void _close_pool()
     {
         // Notify all threads to stop waiting for job
@@ -196,7 +256,9 @@ private:
         _workerThreads.clear();
     }
 
-    // Worker
+    /**
+     * @brief Function used by threads. Here is where all the work is done
+     */
     void _worker_thread()
     {
         std::function<void(void)> job;
