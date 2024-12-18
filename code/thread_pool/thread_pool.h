@@ -15,17 +15,15 @@
 
 /**
  * @brief Enum for thread_pool task priority management
- * @see thread_pool
- * @see thread_pool::do_job()
  */
-enum class job_priority
+enum class priority
 {
     highest,
     high,
     normal,
     low,
     lowest
-};  // END job_priority
+};  // END priority
 
 
 /**
@@ -34,15 +32,40 @@ enum class job_priority
 class thread_pool
 {
 private:
-    std::multimap<  job_priority,
-                    std::function<void(void)>>  _priorityJobQueue;      // Priority queue for jobs
-    std::vector<std::thread>                    _workerThreads;         // Dynamic container for threads
-    mutable std::mutex                          _poolMtx;               // Thread safety mutex of this pool
-    mutable std::condition_variable             _poolCV;                // CV for job start notification
+    /**
+     * @brief Priority queue for jobs. Maintains the insertion order for the same priority
+     */
+    std::multimap<priority, std::function<void(void)>> _priorityJobQueue;
 
-    std::atomic_size_t                          _jobsDone   = 0;        // Counts jobs done until destroyed
-    bool                                        _shutdown   = false;    // Shutdown flag
-    bool                                        _paused     = false;    // Pause flag
+    /**
+     * @brief Dynamic container for threads. Also join automatically when destroyed
+     */
+    std::vector<std::jthread> _workerThreads;
+
+    /**
+     * @brief Thread safety mutex of this pool
+     */
+    mutable std::mutex _poolMtx;
+
+    /**
+     * @brief Condition Variable for job start notification
+     */
+    mutable std::condition_variable _poolCV;
+
+    /**
+     * @brief Counts jobs done until pool is destroyed
+     */
+    std::atomic_size_t _jobsDone = 0;
+
+    /**
+     * @brief Shutdown flag
+     */
+    std::atomic_bool _shutdown = false;
+
+    /**
+     * @brief Pause flag
+     */
+    std::atomic_bool _paused = false;
 
 public:
     // Constructors & Operators
@@ -94,7 +117,7 @@ public:
      */
     size_t jobs_done() const
     {
-        return _jobsDone;
+        return _jobsDone.load(std::memory_order::relaxed);
     }
 
     /**
@@ -118,13 +141,19 @@ public:
     }
 
     /**
+     * @brief Get the shutdown state of the pool
+     */
+    bool is_shutdown() const
+    {
+        return _shutdown.load(std::memory_order::relaxed);
+    }
+
+    /**
      * @brief Get the pause state of the pool
      */
     bool is_paused() const
     {
-        std::lock_guard lock(_poolMtx);
-
-        return _paused;
+        return _paused.load(std::memory_order::relaxed);
     }
 
     /**
@@ -132,9 +161,7 @@ public:
      */
     void pause()
     {
-        std::lock_guard lock(_poolMtx);
-
-        _paused = true;
+        _paused.store(true, std::memory_order::relaxed);
     }
 
     /**
@@ -142,9 +169,7 @@ public:
      */
     void resume()
     {
-        std::lock_guard lock(_poolMtx);
-
-        _paused = false;
+        _paused.store(false, std::memory_order::relaxed);
         _poolCV.notify_all();
     }
 
@@ -192,25 +217,25 @@ public:
      * @param func function object to be called
      * @param args arguments for the call
      * @return A future to be used later to wait for the function to finish executing and obtain its returned value if it has one
+     * @note Use try-catch block when accessing the return value as it may throw
      */
     template<class Functor, class... Args>
-    std::future<std::invoke_result_t<Functor, Args...>> do_job( job_priority prio,
-                                                                Functor&& func,
-                                                                Args&&... args)
+    std::future<std::invoke_result_t<Functor, Args...>> do_job(priority prio, Functor&& func, Args&&... args)
     {
-        using ReturnType = std::invoke_result_t<Functor, Args...>;
+        using _ReturnType = std::invoke_result_t<Functor, Args...>;
 
         // Create a packaged_task for the job
-        auto safeJobPtr = std::make_shared<std::packaged_task<ReturnType()>>(
-        std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
+        auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
+                            std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
 
-        // Move it on the queue (wrapped in a lambda) and unblock a thread
+        // Move it on the queue (wrapped in a lambda)
         {
             std::lock_guard lock(_poolMtx);
-
             _priorityJobQueue.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
-            _poolCV.notify_one();
         }
+
+        // Unblock a thread
+        _poolCV.notify_one();
 
         return safeJobPtr->get_future();
     }
@@ -226,11 +251,11 @@ private:
     {
         _ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
 
-        _shutdown = false;
+        _shutdown.store(false, std::memory_order::relaxed);
 
         for (size_t i = 0; i < nthreads; ++i)
         {
-            std::thread t = std::thread(std::bind(&thread_pool::_worker_thread, this));
+            std::jthread t = std::jthread(std::bind(&thread_pool::_worker_thread, this));
             _workerThreads.push_back(std::move(t));
         }
     }
@@ -241,18 +266,11 @@ private:
     void _close_pool()
     {
         // Notify all threads to stop waiting for job
-        {
-            std::lock_guard lock(_poolMtx);
-
-            _shutdown = true;
-            _poolCV.notify_all();
-        }
-
-        // Threads will exit the loop and will join here
-        for (auto& t : _workerThreads)
-            t.join();
+        _shutdown.store(true, std::memory_order::relaxed);
+        _poolCV.notify_all();
 
         // Destroy thread objects
+        // Threads will exit the loop and will join here automatically
         _workerThreads.clear();
     }
 
@@ -270,12 +288,12 @@ private:
 
                 // Pool is working, but it's paused or there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
-                while (!_shutdown && (_paused || _priorityJobQueue.empty()))
+                while (!is_shutdown() && (is_paused() || _priorityJobQueue.empty()))
                     _poolCV.wait(lock);
 
                 // Pool is closed
                 // Threads finish jobs first if not paused
-                if (_paused || _priorityJobQueue.empty())
+                if (is_paused() || _priorityJobQueue.empty())
                     return;
 
                 // Pool is working/closed, not paused and jobs are available
