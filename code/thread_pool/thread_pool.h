@@ -5,7 +5,8 @@
 #include <condition_variable>
 #include <atomic>
 #include <future>
-#include <map>
+#include <queue>
+#include <deque>
 #include <vector>
 #include <utility>
 #include <functional>
@@ -14,33 +15,117 @@
 
 
 /**
- * @brief Enum for thread_pool task priority management
+ * @brief Used for thread_pool task priority management
+ * @note Lower numbers mean higher priority
  */
-enum class priority
-{
-    highest,
-    high,
-    normal,
-    low,
-    lowest
-};  // END priority
+using priority_t = uint8_t;
 
 
 /**
- * @brief Class that manages multiple tasks in an ordered and threadsafe manner
+ * @brief Namespace for pre-defined priorities
+ */
+namespace priority
+{
+    constexpr priority_t highest    = 0;
+    constexpr priority_t high       = UINT8_MAX / 4;
+    constexpr priority_t normal     = UINT8_MAX / 2;
+    constexpr priority_t low        = UINT8_MAX / 4 * 3;
+    constexpr priority_t lowest     = UINT8_MAX;
+}   // END priority
+
+
+/**
+ * @brief Class that manages multiple tasks in paralel in an ordered and threadsafe manner
  */
 class thread_pool
 {
 private:
+
     /**
-     * @brief Priority queue for jobs. Maintains the insertion order for the same priority
+     * @brief Helper class to be integrated into a priority queue
      */
-    std::multimap<priority, std::function<void(void)>> _priorityJobQueue;
+    class _priority_job
+    {
+    private:
+
+        /**
+         * @brief Used to order the priority queue
+         */
+        priority_t _prio;
+
+        /**
+         * @brief The actual job
+         */
+        std::function<void(void)> _job;
+
+        /**
+         * @brief Tie-breaker for operator<
+         */
+        std::chrono::steady_clock::time_point _timestamp;
+
+    public:
+
+        /**
+         * @brief Default constructor
+         */
+        _priority_job() = default;
+
+        /**
+         * @brief Constructor that sets priority and job for this object
+         * @note Job ownership is transfered
+         */
+        _priority_job(priority_t prio, std::function<void(void)>&& job)
+            : _prio(prio), _job(std::move(job)), _timestamp(std::chrono::steady_clock::now()) { /* Empty */ }
+
+        /**
+         * @brief Default destructor
+         */
+        ~_priority_job() = default;
+
+    public:
+
+        /**
+         * @brief Change priority
+         * @param newPrio The new priority
+         */
+        void set_priority(priority_t newPrio)
+        {
+            _prio = newPrio;
+        }
+
+        /**
+         * @brief Call the stored job if any
+         */
+        void operator()() const
+        {
+            if (_job)
+                _job();
+        }
+
+    public:
+
+        /**
+         * @brief Operator used by std::less in std::priority_queue ordering
+         * @note Time of submission is used if priorities are equal. Maintains insertion order
+         */
+        friend bool operator<(const _priority_job& left, const _priority_job& right)
+        {
+            return (left._prio == right._prio)  ? left._timestamp < right._timestamp
+                                                : left._prio < right._prio;
+        }
+    };  // END _priority_job
+
+private:
+
+    /**
+     * @brief Priority queue for jobs
+     */
+    std::priority_queue<_priority_job, std::deque<_priority_job>> _jobs;
 
     /**
      * @brief Dynamic container for threads. Also join automatically when destroyed
      */
-    std::vector<std::jthread> _workerThreads;
+    std::vector<std::jthread> _threads;
 
     /**
      * @brief Thread safety mutex of this pool
@@ -109,7 +194,7 @@ public:
      */
     size_t thread_count() const
     {
-        return _workerThreads.size();
+        return _threads.size();
     }
 
     /**
@@ -127,7 +212,7 @@ public:
     {
         std::lock_guard lock(_poolMtx);
 
-        return _priorityJobQueue.size();   
+        return _jobs.size();   
     }
 
     /**
@@ -137,7 +222,8 @@ public:
     {
         std::lock_guard lock(_poolMtx);
 
-        _priorityJobQueue.clear();
+        while (!_jobs.empty())
+            _jobs.pop();
     }
 
     /**
@@ -220,7 +306,7 @@ public:
      * @note Use try-catch block when accessing the return value as it may throw
      */
     template<class Functor, class... Args>
-    std::future<std::invoke_result_t<Functor, Args...>> do_job(priority prio, Functor&& func, Args&&... args)
+    std::future<std::invoke_result_t<Functor, Args...>> do_job(priority_t prio, Functor&& func, Args&&... args)
     {
         using _ReturnType = std::invoke_result_t<Functor, Args...>;
 
@@ -231,7 +317,7 @@ public:
         // Move it on the queue (wrapped in a lambda)
         {
             std::lock_guard lock(_poolMtx);
-            _priorityJobQueue.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+            _jobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
         }
 
         // Unblock a thread
@@ -256,7 +342,7 @@ private:
         for (size_t i = 0; i < nthreads; ++i)
         {
             std::jthread t = std::jthread(std::bind(&thread_pool::_worker_thread, this));
-            _workerThreads.push_back(std::move(t));
+            _threads.push_back(std::move(t));
         }
     }
 
@@ -271,7 +357,7 @@ private:
 
         // Destroy thread objects
         // Threads will exit the loop and will join here automatically
-        _workerThreads.clear();
+        _threads.clear();
     }
 
     /**
@@ -279,7 +365,7 @@ private:
      */
     void _worker_thread()
     {
-        std::function<void(void)> job;
+        _priority_job job;
 
         for (;;)
         {
@@ -288,19 +374,18 @@ private:
 
                 // Pool is working, but it's paused or there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
-                while (!is_shutdown() && (is_paused() || _priorityJobQueue.empty()))
+                while (!is_shutdown() && (is_paused() || _jobs.empty()))
                     _poolCV.wait(lock);
 
                 // Pool is closed
                 // Threads finish jobs first if not paused
-                if (is_paused() || _priorityJobQueue.empty())
+                if (is_paused() || _jobs.empty())
                     return;
 
                 // Pool is working/closed, not paused and jobs are available
                 // Assign job to thread from queue
-                auto it = _priorityJobQueue.begin();
-                job = std::move(it->second);
-                _priorityJobQueue.erase(it);
+                job = std::move(const_cast<_priority_job&>(_jobs.top()));
+                _jobs.pop();
             }   // Empty scope end -> unlock, can start job
 
             // Do the job without holding any locks
