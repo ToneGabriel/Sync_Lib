@@ -49,7 +49,7 @@ private:
     private:
 
         /**
-         * @brief Used to order the priority queue
+         * @brief User set priority
          */
         priority_t _prio;
 
@@ -59,7 +59,7 @@ private:
         std::function<void(void)> _job;
 
         /**
-         * @brief Tie-breaker for operator<
+         * @brief Insertion time
          */
         std::chrono::steady_clock::time_point _timestamp;
 
@@ -75,22 +75,44 @@ private:
          * @note Job ownership is transfered
          */
         _priority_job(priority_t prio, std::function<void(void)>&& job)
-            : _prio(prio), _job(std::move(job)), _timestamp(std::chrono::steady_clock::now()) { /* Empty */ }
+            :   _prio(prio),
+                _job(std::move(job)),
+                _timestamp(std::chrono::steady_clock::now())
+        {
+            // Empty
+        }
 
         /**
          * @brief Default destructor
          */
         ~_priority_job() = default;
 
+        /**
+         * @brief Delete copy constructor and operator
+         */
+        _priority_job(const _priority_job&)             = delete;
+        _priority_job& operator=(const _priority_job&)  = delete;
+
+        /**
+         * @brief Move constructor and operator are allowed
+         */
+        _priority_job(_priority_job&&)                  = default;
+        _priority_job& operator=(_priority_job&&)       = default;
+
     public:
 
         /**
-         * @brief Change priority
-         * @param newPrio The new priority
+         * @brief Number used for comparison in priority_queue
+         * @note Priority might be higher than the original due to wait time
          */
-        void set_priority(priority_t newPrio)
+        priority_t effective_priority() const
         {
-            _prio = newPrio;
+            auto age = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _timestamp).count();
+
+            if (_prio <= age)
+                return 0;
+
+            return _prio - age;
         }
 
         /**
@@ -106,12 +128,11 @@ private:
 
         /**
          * @brief Operator used by std::less in std::priority_queue ordering
-         * @note Time of submission is used if priorities are equal. Maintains insertion order
+         * @note Lower numbers mean higher priority
          */
         friend bool operator<(const _priority_job& left, const _priority_job& right)
         {
-            return (left._prio == right._prio)  ? left._timestamp < right._timestamp
-                                                : left._prio < right._prio;
+            return left.effective_priority() > right.effective_priority();
         }
     };  // END _priority_job
 
@@ -180,9 +201,15 @@ public:
         shutdown();
     }
 
+    /**
+     * @brief Delete copy/move constructors
+     */
     thread_pool(const thread_pool&)             = delete;
     thread_pool(thread_pool&&)                  = delete;
 
+    /**
+     * @brief Delete copy/move operators
+     */
     thread_pool& operator=(const thread_pool&)  = delete;
     thread_pool& operator=(thread_pool&&)       = delete;
 
@@ -297,8 +324,8 @@ public:
 
     /**
      * @brief Assign new job with priority
-     * @tparam Functor type of the function object
-     * @tparam Args types of the arguments of the function object
+     * @tparam functor type of the function object
+     * @tparam args types of the arguments of the function object
      * @param prio priority in queue
      * @param func function object to be called
      * @param args arguments for the call
