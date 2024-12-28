@@ -156,9 +156,9 @@ void test_5()
     pool.do_job(priority::high, foo_3_except_ok);
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
-    pool.force_shutdown();
+    pool.force_join();
 
-    std::cout << "Pool shutdown with finished jobs " << pool.jobs_done() << '\n';
+    std::cout << "Pool joined with finished jobs " << pool.jobs_done() << '\n';
 
     pool.restart(5);
     std::cout << "Pool restarted\n";
@@ -177,9 +177,9 @@ void test_5()
     pool.do_job(priority::high, high_prio);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
-    pool.force_shutdown();
+    pool.force_join();
 
-    std::cout << "Pool shutdown with finished jobs " << pool.jobs_done() << '\n';
+    std::cout << "Pool joined with finished jobs " << pool.jobs_done() << '\n';
 
     std::cout << "Pool destroyed\n";
 }

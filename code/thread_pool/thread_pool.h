@@ -15,23 +15,17 @@
 
 
 /**
- * @brief Used for thread_pool task priority management
- * @note Lower numbers mean higher priority
+ * @brief Enum for job priority in thread_pool internal queue
+ * @note Priority might change based on wait time
  */
-using priority_t = uint8_t;
-
-
-/**
- * @brief Namespace for pre-defined priorities
- */
-namespace priority
+enum class priority
 {
-    constexpr priority_t highest    = 0;
-    constexpr priority_t high       = UINT8_MAX / 4;
-    constexpr priority_t normal     = UINT8_MAX / 2;
-    constexpr priority_t low        = UINT8_MAX / 4 * 3;
-    constexpr priority_t lowest     = UINT8_MAX;
-}   // END priority
+    highest = 0,
+    high    = UINT8_MAX / 4,
+    normal  = UINT8_MAX / 2,
+    low     = UINT8_MAX / 4 * 3,
+    lowest  = UINT8_MAX
+};  // END priority
 
 
 /**
@@ -51,7 +45,7 @@ private:
         /**
          * @brief User set priority
          */
-        priority_t _prio;
+        priority _prio;
 
         /**
          * @brief The actual job
@@ -74,7 +68,7 @@ private:
          * @brief Constructor that sets priority and job for this object
          * @note Job ownership is transfered
          */
-        _priority_job(priority_t prio, std::function<void(void)>&& job)
+        _priority_job(priority prio, std::function<void(void)>&& job)
             :   _prio(prio),
                 _job(std::move(job)),
                 _timestamp(std::chrono::steady_clock::now())
@@ -102,20 +96,6 @@ private:
     public:
 
         /**
-         * @brief Number used for comparison in priority_queue
-         * @note Priority might be higher than the original due to wait time
-         */
-        priority_t effective_priority() const
-        {
-            auto age = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _timestamp).count();
-
-            if (_prio <= age)
-                return 0;
-
-            return _prio - age;
-        }
-
-        /**
          * @brief Call the stored job if any
          */
         void operator()() const
@@ -124,15 +104,30 @@ private:
                 _job();
         }
 
+    private:
+
+        /**
+         * @brief Number used for comparison in priority_queue
+         * @note Priority might be higher than the original due to wait time
+         */
+        uint8_t _effective_priority() const
+        {
+            auto age    = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _timestamp).count();
+            auto prio   = static_cast<uint8_t>(_prio);
+
+            return (prio <= age) ? 0 : prio - age;
+        }
+
     public:
 
         /**
          * @brief Operator used by std::less in std::priority_queue ordering
+         * @param left, right object to compare
          * @note Lower numbers mean higher priority
          */
         friend bool operator<(const _priority_job& left, const _priority_job& right)
         {
-            return left.effective_priority() > right.effective_priority();
+            return left._effective_priority() > right._effective_priority();
         }
     };  // END _priority_job
 
@@ -141,7 +136,12 @@ private:
     /**
      * @brief Priority queue for jobs
      */
-    std::priority_queue<_priority_job, std::deque<_priority_job>> _jobs;
+    std::priority_queue<_priority_job> _pendingJobs;
+
+    /**
+     * @brief Vector to store jobs that are not yet in queue
+     */
+    std::vector<_priority_job> _storedJobs;
 
     /**
      * @brief Dynamic container for threads. Also join automatically when destroyed
@@ -164,9 +164,9 @@ private:
     std::atomic_size_t _jobsDone = 0;
 
     /**
-     * @brief Shutdown flag
+     * @brief Join flag
      */
-    std::atomic_bool _shutdown = false;
+    std::atomic_bool _joined = false;
 
     /**
      * @brief Pause flag
@@ -198,7 +198,7 @@ public:
      */
     ~thread_pool()
     {
-        shutdown();
+        join();
     }
 
     /**
@@ -239,7 +239,7 @@ public:
     {
         std::lock_guard lock(_poolMtx);
 
-        return _jobs.size();   
+        return _pendingJobs.size();   
     }
 
     /**
@@ -249,16 +249,33 @@ public:
     {
         std::lock_guard lock(_poolMtx);
 
-        while (!_jobs.empty())
-            _jobs.pop();
+        while (!_pendingJobs.empty())
+            _pendingJobs.pop();
     }
 
     /**
-     * @brief Get the shutdown state of the pool
+     * @brief Get the number of jobs stored for later execution
+     * @note Start them later using `flush_job_storage()`
      */
-    bool is_shutdown() const
+    size_t stored_jobs() const
     {
-        return _shutdown.load(std::memory_order::relaxed);
+        return _storedJobs.size();
+    }
+
+    /**
+     * @brief Remove ALL jobs stored for later execution
+     */
+    void clear_stored_jobs()
+    {
+        _storedJobs.clear();
+    }
+
+    /**
+     * @brief Get the join state of the pool
+     */
+    bool is_joined() const
+    {
+        return _joined.load(std::memory_order::relaxed);
     }
 
     /**
@@ -270,7 +287,7 @@ public:
     }
 
     /**
-     * @brief Worker threads wait until resume or shutdown
+     * @brief Worker threads wait until resume or join
      */
     void pause()
     {
@@ -294,46 +311,48 @@ public:
     {
         pause();
 
-        _close_pool();  // threads join after running jobs are done
+        _join();  // threads join after running jobs are done
 
-        _open_pool(nthreads);   // new threads are created and started
+        _start(nthreads);   // new threads are created and started
 
         resume();
     }
 
     /**
-     * @brief Destroy threads, but NOT before finishing ALL jobs
+     * @brief Join threads, but NOT before finishing ALL jobs
+     * @note Use `restart()` to create new threads
      */
-    void shutdown()
+    void join()
     {
         resume();   // ensure the pool is not paused
 
-        _close_pool();  // threads join after ALL jobs are done
+        _join();    // threads join after ALL jobs are done
     }
 
     /**
-     * @brief Destroy threads after finishing running jobs
-     * @note If the pool is destroyed after a forced shutdown, the remaining jobs will be lost
+     * @brief Join threads after finishing running jobs
+     * @note If the pool is destroyed after a forced join, the remaining jobs will be lost
+     * @note Use `restart()` to create new threads
      */
-    void force_shutdown()
+    void force_join()
     {
-        pause();
+        pause();    // wait for running jobs to finish
 
-        _close_pool();  // threads join after running jobs are done
+        _join();    // threads join after running jobs are done
     }
 
     /**
      * @brief Assign new job with priority
-     * @tparam functor type of the function object
-     * @tparam args types of the arguments of the function object
+     * @tparam Functor type of the function object
+     * @tparam Args types of the arguments of the function object
      * @param prio priority in queue
      * @param func function object to be called
      * @param args arguments for the call
-     * @return A future to be used later to wait for the function to finish executing and obtain its returned value if it has one
-     * @note Use try-catch block when accessing the return value as it may throw
+     * @return A `std::future` to be used later to wait for the function to finish executing and obtain its returned value if it has one
+     * @note Use `try`-`catch` block when accessing the return value if the function call throws
      */
     template<class Functor, class... Args>
-    std::future<std::invoke_result_t<Functor, Args...>> do_job(priority_t prio, Functor&& func, Args&&... args)
+    std::future<std::invoke_result_t<Functor, Args...>> do_job(priority prio, Functor&& func, Args&&... args)
     {
         using _ReturnType = std::invoke_result_t<Functor, Args...>;
 
@@ -344,13 +363,57 @@ public:
         // Move it on the queue (wrapped in a lambda)
         {
             std::lock_guard lock(_poolMtx);
-            _jobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+            _pendingJobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
         }
 
         // Unblock a thread
         _poolCV.notify_one();
 
         return safeJobPtr->get_future();
+    }
+
+    /**
+     * @brief Store new job with priority. Start later using `flush_job_storage()`
+     * @tparam Functor type of the function object
+     * @tparam Args types of the arguments of the function object
+     * @param prio priority in queue
+     * @param func function object to be called
+     * @param args arguments for the call
+     * @return A `std::future` to be used later to wait for the function to finish executing and obtain its returned value if it has one
+     * @note Use `try`-`catch` block when accessing the return value if the function call throws
+     */
+    template<class Functor, class... Args>
+    std::future<std::invoke_result_t<Functor, Args...>> store_job(priority prio, Functor&& func, Args&&... args)
+    {
+        using _ReturnType = std::invoke_result_t<Functor, Args...>;
+
+        // Create a packaged_task for the job
+        auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
+                            std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
+
+        // Move it on the vector (wrapped in a lambda) (no lock needed)
+        _storedJobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+
+        return safeJobPtr->get_future();
+    }
+
+    /**
+     * @brief Assign ALL stored jobs to the execution queue
+     * @note Does not call `restart()`/`resume()`if `join()`/`pause()` was called previously
+     */
+    void flush_job_storage ()
+    {
+        std::lock_guard lock(_poolMtx);
+
+        // Move jobs to the execution queue
+        while (!_storedJobs.empty())
+        {
+            _pendingJobs.emplace(std::move(_storedJobs.back()));
+            _storedJobs.pop_back();
+        }
+
+        // Notify all threads to stop waiting for job
+        _poolCV.notify_all();
     }
 
 private:
@@ -360,11 +423,11 @@ private:
      * @brief Create a number of threads
      * @param nthreads threads to create
      */
-    void _open_pool(const size_t nthreads)
+    void _start(const size_t nthreads)
     {
         _ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
 
-        _shutdown.store(false, std::memory_order::relaxed);
+        _joined.store(false, std::memory_order::relaxed);
 
         for (size_t i = 0; i < nthreads; ++i)
         {
@@ -376,10 +439,10 @@ private:
     /**
      * @brief Signal threads the pool is closed, then join
      */
-    void _close_pool()
+    void _join()
     {
         // Notify all threads to stop waiting for job
-        _shutdown.store(true, std::memory_order::relaxed);
+        _joined.store(true, std::memory_order::relaxed);
         _poolCV.notify_all();
 
         // Destroy thread objects
@@ -401,18 +464,18 @@ private:
 
                 // Pool is working, but it's paused or there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
-                while (!is_shutdown() && (is_paused() || _jobs.empty()))
+                while (!is_joined() && (is_paused() || _pendingJobs.empty()))
                     _poolCV.wait(lock);
 
-                // Pool is closed
+                // Pool is joined
                 // Threads finish jobs first if not paused
-                if (is_paused() || _jobs.empty())
+                if (is_paused() || _pendingJobs.empty())
                     return;
 
-                // Pool is working/closed, not paused and jobs are available
+                // Pool is working/joined, not paused and jobs are available
                 // Assign job to thread from queue
-                job = std::move(const_cast<_priority_job&>(_jobs.top()));
-                _jobs.pop();
+                job = std::move(const_cast<_priority_job&>(_pendingJobs.top()));
+                _pendingJobs.pop();
             }   // Empty scope end -> unlock, can start job
 
             // Do the job without holding any locks
