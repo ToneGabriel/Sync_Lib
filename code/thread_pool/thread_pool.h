@@ -88,10 +88,25 @@ private:
         _priority_job& operator=(const _priority_job&)  = delete;
 
         /**
-         * @brief Move constructor and operator are allowed
+         * @brief Move constructor
+         * @param other object to be moved
          */
-        _priority_job(_priority_job&&)                  = default;
-        _priority_job& operator=(_priority_job&&)       = default;
+        _priority_job(_priority_job&& other) noexcept
+        {
+            _move(std::move(other));
+        }
+
+        /**
+         * @brief Move assign operator
+         * @param other object to be moved
+         */
+        _priority_job& operator=(_priority_job&& other) noexcept
+        {
+            if (this != &other)
+                _move(std::move(other));
+
+            return *this;
+        }
 
     public:
 
@@ -107,11 +122,23 @@ private:
     private:
 
         /**
-         * @brief Number used for comparison in priority_queue
+         * @brief Ownership transfer algorithm
+         * @param other object from where to get data
+         */
+        void _move(_priority_job&& other) noexcept
+        {
+            _prio       = other._prio;
+            _job        = std::move(other._job);
+            _timestamp  = std::chrono::steady_clock::now(); // timestamp is refreshed
+        }
+
+        /**
+         * @brief Number used by `operator<` for comparison in priority_queue
          * @note Priority might be higher than the original due to wait time
          */
         uint8_t _effective_priority() const
         {
+            // Subtract from original priority the number of seconds this object waited since timestamp
             auto age    = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _timestamp).count();
             auto prio   = static_cast<uint8_t>(_prio);
 
@@ -121,7 +148,7 @@ private:
     public:
 
         /**
-         * @brief Operator used by std::less in std::priority_queue ordering
+         * @brief Operator used by `std::less` in `std::priority_queue` ordering
          * @param left, right object to compare
          * @note Lower numbers mean higher priority
          */
@@ -259,6 +286,8 @@ public:
      */
     size_t stored_jobs() const
     {
+        std::lock_guard lock(_poolMtx);
+
         return _storedJobs.size();
     }
 
@@ -267,6 +296,8 @@ public:
      */
     void clear_stored_jobs()
     {
+        std::lock_guard lock(_poolMtx);
+
         _storedJobs.clear();
     }
 
@@ -392,7 +423,7 @@ public:
                             std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
 
         // Move it on the vector (wrapped in a lambda) (no lock needed)
-        _storedJobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+        _storedJobs.emplace_back(prio, [safeJobPtr]() { (*safeJobPtr)(); });
 
         return safeJobPtr->get_future();
     }
@@ -401,7 +432,7 @@ public:
      * @brief Assign ALL stored jobs to the execution queue
      * @note Does not call `restart()`/`resume()`if `join()`/`pause()` was called previously
      */
-    void flush_job_storage ()
+    void flush_job_storage()
     {
         std::lock_guard lock(_poolMtx);
 

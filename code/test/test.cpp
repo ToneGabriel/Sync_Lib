@@ -40,18 +40,25 @@ void lowest_prio()
     std::cout << "lowest_prio done!\n";
 }
 
-void foo_3_except_nok()
+void foo_except_nok()
 {
-    std::cout << "foo_3_except_nok running...\n";
+    std::cout << "foo_except_nok running...\n";
     std::this_thread::sleep_for(std::chrono::seconds(3));
     throw -3;
 }
 
-void foo_3_except_ok()
+void foo_except_ok()
 {
-    std::cout << "foo_3_except_ok running...\n";
+    std::cout << "foo_except_ok running...\n";
     std::this_thread::sleep_for(std::chrono::seconds(3));
     throw std::out_of_range("Out of range exception");
+}
+
+int foo_return()
+{
+    std::cout << "foo_return running...\n";
+    std::this_thread::sleep_for(std::chrono::seconds(1));
+    return 42;
 }
 
 // Tests
@@ -142,18 +149,18 @@ void test_5()
 {
     thread_pool pool(2);
 
-    pool.do_job(priority::normal, foo_3_except_nok);
-    pool.do_job(priority::high, foo_3_except_ok);
-    pool.do_job(priority::highest, foo_3_except_nok);
-    pool.do_job(priority::normal, foo_3_except_ok);
-    pool.do_job(priority::low, foo_3_except_nok);
-    pool.do_job(priority::normal, foo_3_except_ok);
-    pool.do_job(priority::normal, foo_3_except_nok);
-    pool.do_job(priority::high, foo_3_except_nok);
-    pool.do_job(priority::lowest, foo_3_except_ok);
-    pool.do_job(priority::normal, foo_3_except_nok);
-    pool.do_job(priority::lowest, foo_3_except_nok);
-    pool.do_job(priority::high, foo_3_except_ok);
+    pool.do_job(priority::normal, foo_except_nok);
+    pool.do_job(priority::high, foo_except_ok);
+    pool.do_job(priority::highest, foo_except_nok);
+    pool.do_job(priority::normal, foo_except_ok);
+    pool.do_job(priority::low, foo_except_nok);
+    pool.do_job(priority::normal, foo_except_ok);
+    pool.do_job(priority::normal, foo_except_nok);
+    pool.do_job(priority::high, foo_except_nok);
+    pool.do_job(priority::lowest, foo_except_ok);
+    pool.do_job(priority::normal, foo_except_nok);
+    pool.do_job(priority::lowest, foo_except_nok);
+    pool.do_job(priority::high, foo_except_ok);
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
     pool.force_join();
@@ -182,4 +189,48 @@ void test_5()
     std::cout << "Pool joined with finished jobs " << pool.jobs_done() << '\n';
 
     std::cout << "Pool destroyed\n";
+}
+
+void test_6()
+{
+    thread_pool pool(2);
+    
+    pool.store_job(priority::normal, normal_prio);
+    pool.store_job(priority::high, high_prio);
+    pool.store_job(priority::highest, highest_prio);
+    pool.store_job(priority::normal, normal_prio);
+    pool.store_job(priority::low, low_prio);
+    pool.store_job(priority::normal, normal_prio);
+    pool.store_job(priority::normal, normal_prio);
+    pool.store_job(priority::high, high_prio);
+    pool.store_job(priority::lowest, lowest_prio);
+    pool.store_job(priority::normal, normal_prio);
+    pool.store_job(priority::lowest, lowest_prio);
+    pool.store_job(priority::high, high_prio);
+
+    std::cout << "Pool stored some jobs " << pool.stored_jobs() << '\n';
+
+    pool.flush_job_storage();
+
+    std::cout << "Pool flushed stored jobs " << '\n';
+}
+
+void test_7()
+{
+    thread_pool pool(2);
+    
+    auto ret1 = pool.do_job(priority::high, foo_return);
+    auto ret2 = pool.do_job(priority::normal, foo_except_ok);
+
+    try
+    {
+        int result = ret1.get();
+        std::cout << "Result = " << result << '\n';
+
+        ret2.get();
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << "Exception message = " << e.what() << '\n';
+    }
 }
