@@ -335,18 +335,28 @@ public:
     }
 
     /**
-     * @brief Pause, close pool and reopen with new number of threads, resume
+     * @brief Close pool and reopen with new number of threads
      * @param nthreads new number of threads
+     * @note Pause state is kept
      */
     void restart(const size_t nthreads)
     {
-        pause();
+        if (is_paused())
+        {
+            _join();
 
-        _join();  // threads join after running jobs are done
+            _start(nthreads);
+        }
+        else
+        {
+            pause();
 
-        _start(nthreads);   // new threads are created and started
+            _join();
 
-        resume();
+            _start(nthreads);
+
+            resume();
+        }
     }
 
     /**
@@ -434,13 +444,15 @@ public:
      */
     void flush_job_storage()
     {
-        std::lock_guard lock(_poolMtx);
-
-        // Move jobs to the execution queue
-        while (!_storedJobs.empty())
         {
-            _pendingJobs.emplace(std::move(_storedJobs.back()));
-            _storedJobs.pop_back();
+            std::lock_guard lock(_poolMtx);
+
+            // Move jobs to the execution queue
+            while (!_storedJobs.empty())
+            {
+                _pendingJobs.emplace(std::move(_storedJobs.back()));
+                _storedJobs.pop_back();
+            }
         }
 
         // Notify all threads to stop waiting for job
