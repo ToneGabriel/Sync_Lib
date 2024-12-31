@@ -18,7 +18,7 @@
  * @brief Enum for job priority in thread_pool internal queue
  * @note Priority might change based on wait time
  */
-enum class priority
+enum class priority : uint8_t
 {
     highest = 0,
     high    = UINT8_MAX / 4,
@@ -28,135 +28,140 @@ enum class priority
 };  // END priority
 
 
+DETAIL_BEGIN
+
+/**
+ * @brief Helper class to be integrated into a priority queue
+ */
+class _priority_job
+{
+private:
+
+    /**
+     * @brief User set priority
+     */
+    priority _prio;
+
+    /**
+     * @brief The actual job
+     */
+    std::function<void(void)> _job;
+
+    /**
+     * @brief Insertion time
+     */
+    typename std::chrono::steady_clock::time_point _timestamp;
+
+public:
+
+    /**
+     * @brief Default constructor
+     */
+    _priority_job() = default;
+
+    /**
+     * @brief Constructor that sets priority and job for this object
+     * @note Job ownership is transfered
+     */
+    _priority_job(priority prio, std::function<void(void)>&& job)
+        :   _prio(prio),
+            _job(std::move(job)),
+            _timestamp(std::chrono::steady_clock::now())
+    {
+        // Empty
+    }
+
+    /**
+     * @brief Default destructor
+     */
+    ~_priority_job() = default;
+
+    /**
+     * @brief Delete copy constructor and operator
+     */
+    _priority_job(const _priority_job&)             = delete;
+    _priority_job& operator=(const _priority_job&)  = delete;
+
+    /**
+     * @brief Move constructor
+     * @param other object to be moved
+     */
+    _priority_job(_priority_job&& other) noexcept
+    {
+        _move(std::move(other));
+    }
+
+    /**
+     * @brief Move assign operator
+     * @param other object to be moved
+     */
+    _priority_job& operator=(_priority_job&& other) noexcept
+    {
+        if (this != &other)
+            _move(std::move(other));
+
+        return *this;
+    }
+
+public:
+
+    /**
+     * @brief Call the stored job if any
+     */
+    void operator()() const
+    {
+        if (_job)
+            _job();
+    }
+
+    /**
+     * @brief Number used by `operator<` for comparison in `std::priority_queue`
+     * @note Priority might be higher than the original due to wait time
+     */
+    uint8_t effective_priority() const
+    {
+        // Subtract from original priority the number of seconds this object waited since timestamp
+        auto age    = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _timestamp).count();
+        auto prio   = static_cast<uint8_t>(_prio);
+
+        return (prio <= age) ? 0 : prio - age;
+    }
+
+private:
+
+    /**
+     * @brief Ownership transfer algorithm
+     * @param other object from where to get data
+     */
+    void _move(_priority_job&& other) noexcept
+    {
+        _prio       = other._prio;
+        _job        = std::move(other._job);
+        _timestamp  = std::chrono::steady_clock::now(); // timestamp is refreshed
+    }
+};  // END _priority_job
+
+
+/**
+ * @brief Operator used in `std::priority_queue` ordering
+ * @param left, right object to compare
+ * @note Lower numbers mean higher priority
+ */
+inline bool operator<(const _priority_job& left, const _priority_job& right)
+{
+    return left.effective_priority() > right.effective_priority();
+}
+
+DETAIL_END
+
+
 /**
  * @brief Class that manages multiple tasks in paralel in an ordered and threadsafe manner
  */
 class thread_pool
 {
 private:
-
-    /**
-     * @brief Helper class to be integrated into a priority queue
-     */
-    class _priority_job
-    {
-    private:
-
-        /**
-         * @brief User set priority
-         */
-        priority _prio;
-
-        /**
-         * @brief The actual job
-         */
-        std::function<void(void)> _job;
-
-        /**
-         * @brief Insertion time
-         */
-        std::chrono::steady_clock::time_point _timestamp;
-
-    public:
-
-        /**
-         * @brief Default constructor
-         */
-        _priority_job() = default;
-
-        /**
-         * @brief Constructor that sets priority and job for this object
-         * @note Job ownership is transfered
-         */
-        _priority_job(priority prio, std::function<void(void)>&& job)
-            :   _prio(prio),
-                _job(std::move(job)),
-                _timestamp(std::chrono::steady_clock::now())
-        {
-            // Empty
-        }
-
-        /**
-         * @brief Default destructor
-         */
-        ~_priority_job() = default;
-
-        /**
-         * @brief Delete copy constructor and operator
-         */
-        _priority_job(const _priority_job&)             = delete;
-        _priority_job& operator=(const _priority_job&)  = delete;
-
-        /**
-         * @brief Move constructor
-         * @param other object to be moved
-         */
-        _priority_job(_priority_job&& other) noexcept
-        {
-            _move(std::move(other));
-        }
-
-        /**
-         * @brief Move assign operator
-         * @param other object to be moved
-         */
-        _priority_job& operator=(_priority_job&& other) noexcept
-        {
-            if (this != &other)
-                _move(std::move(other));
-
-            return *this;
-        }
-
-    public:
-
-        /**
-         * @brief Call the stored job if any
-         */
-        void operator()() const
-        {
-            if (_job)
-                _job();
-        }
-
-    private:
-
-        /**
-         * @brief Ownership transfer algorithm
-         * @param other object from where to get data
-         */
-        void _move(_priority_job&& other) noexcept
-        {
-            _prio       = other._prio;
-            _job        = std::move(other._job);
-            _timestamp  = std::chrono::steady_clock::now(); // timestamp is refreshed
-        }
-
-        /**
-         * @brief Number used by `operator<` for comparison in priority_queue
-         * @note Priority might be higher than the original due to wait time
-         */
-        uint8_t _effective_priority() const
-        {
-            // Subtract from original priority the number of seconds this object waited since timestamp
-            auto age    = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::steady_clock::now() - _timestamp).count();
-            auto prio   = static_cast<uint8_t>(_prio);
-
-            return (prio <= age) ? 0 : prio - age;
-        }
-
-    public:
-
-        /**
-         * @brief Operator used by `std::less` in `std::priority_queue` ordering
-         * @param left, right object to compare
-         * @note Lower numbers mean higher priority
-         */
-        friend bool operator<(const _priority_job& left, const _priority_job& right)
-        {
-            return left._effective_priority() > right._effective_priority();
-        }
-    };  // END _priority_job
+    using _priority_job = detail::_priority_job;
 
 private:
 
@@ -383,7 +388,7 @@ public:
     }
 
     /**
-     * @brief Assign new job with priority
+     * @brief Assign new job with given priority
      * @tparam Functor type of the function object
      * @tparam Args types of the arguments of the function object
      * @param prio priority in queue
@@ -414,7 +419,22 @@ public:
     }
 
     /**
-     * @brief Store new job with priority. Start later using `flush_job_storage()`
+     * @brief Assign new job with `priority::normal`
+     * @tparam Functor type of the function object
+     * @tparam Args types of the arguments of the function object
+     * @param func function object to be called
+     * @param args arguments for the call
+     * @return A `std::future` to be used later to wait for the function to finish executing and obtain its returned value if it has one
+     * @note Use `try`-`catch` block when accessing the return value if the function call throws
+     */
+    template<class Functor, class... Args>
+    std::future<std::invoke_result_t<Functor, Args...>> do_job(Functor&& func, Args&&... args)
+    {
+        return do_job(priority::normal, std::forward<Functor>(func), std::forward<Args>(args)...);
+    }
+
+    /**
+     * @brief Store new job with given priority. Start later using `flush_job_storage()`
      * @tparam Functor type of the function object
      * @tparam Args types of the arguments of the function object
      * @param prio priority in queue
@@ -436,6 +456,21 @@ public:
         _storedJobs.emplace_back(prio, [safeJobPtr]() { (*safeJobPtr)(); });
 
         return safeJobPtr->get_future();
+    }
+
+    /**
+     * @brief Store new job with `priority::normal`. Start later using `flush_job_storage()`
+     * @tparam Functor type of the function object
+     * @tparam Args types of the arguments of the function object
+     * @param func function object to be called
+     * @param args arguments for the call
+     * @return A `std::future` to be used later to wait for the function to finish executing and obtain its returned value if it has one
+     * @note Use `try`-`catch` block when accessing the return value if the function call throws
+     */
+    template<class Functor, class... Args>
+    std::future<std::invoke_result_t<Functor, Args...>> store_job(Functor&& func, Args&&... args)
+    {
+        return store_job(priority::normal, std::forward<Functor>(func), std::forward<Args>(args)...);
     }
 
     /**
