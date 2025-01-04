@@ -4,5 +4,5 @@ target_sources(${LIBRARY_NAME} PUBLIC
 
 )
 
-add_subdirectory(thread_pool)
+add_subdirectory(sync)
 add_subdirectory(test)

@@ -65,48 +65,48 @@ int foo_return()
 // ===========================================================
 void test_1()
 {
-    thread_pool pool(1);
+    sync::thread_pool pool(1);
 
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::highest, highest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::highest, highest_prio);
 }
 
 void test_2()
 {
-    thread_pool pool;
+    sync::thread_pool pool;
 
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::highest, highest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::low, low_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::high, high_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::highest, highest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::low, low_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::high, high_prio);
 }
 
 void test_3()
 {
-    thread_pool pool(2);
+    sync::thread_pool pool(2);
     std::cout << "Pool has " << pool.thread_count() << " threads\n";
 
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::highest, highest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::low, low_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::high, high_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::highest, highest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::low, low_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::high, high_prio);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     pool.restart(5);
@@ -115,25 +115,25 @@ void test_3()
 
 void test_4()
 {
-    thread_pool pool(2);
+    sync::thread_pool pool(2);
 
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::highest, highest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::low, low_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::normal, normal_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::highest, highest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::low, low_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
     
     pool.pause();
     std::cout << "Pool paused\n";
     std::this_thread::sleep_for(std::chrono::seconds(1));
 
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::high, high_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::high, high_prio);
 
     std::this_thread::sleep_for(std::chrono::seconds(3));
 
@@ -147,20 +147,20 @@ void test_4()
 
 void test_5()
 {
-    thread_pool pool(2);
+    sync::thread_pool pool(2);
 
-    pool.do_job(priority::normal, foo_except_nok);
-    pool.do_job(priority::high, foo_except_ok);
-    pool.do_job(priority::highest, foo_except_nok);
-    pool.do_job(priority::normal, foo_except_ok);
-    pool.do_job(priority::low, foo_except_nok);
-    pool.do_job(priority::normal, foo_except_ok);
-    pool.do_job(priority::normal, foo_except_nok);
-    pool.do_job(priority::high, foo_except_nok);
-    pool.do_job(priority::lowest, foo_except_ok);
-    pool.do_job(priority::normal, foo_except_nok);
-    pool.do_job(priority::lowest, foo_except_nok);
-    pool.do_job(priority::high, foo_except_ok);
+    pool.do_job(sync::priority::normal, foo_except_nok);
+    pool.do_job(sync::priority::high, foo_except_ok);
+    pool.do_job(sync::priority::highest, foo_except_nok);
+    pool.do_job(sync::priority::normal, foo_except_ok);
+    pool.do_job(sync::priority::low, foo_except_nok);
+    pool.do_job(sync::priority::normal, foo_except_ok);
+    pool.do_job(sync::priority::normal, foo_except_nok);
+    pool.do_job(sync::priority::high, foo_except_nok);
+    pool.do_job(sync::priority::lowest, foo_except_ok);
+    pool.do_job(sync::priority::normal, foo_except_nok);
+    pool.do_job(sync::priority::lowest, foo_except_nok);
+    pool.do_job(sync::priority::high, foo_except_ok);
 
     std::this_thread::sleep_for(std::chrono::seconds(4));
     pool.force_join();
@@ -170,18 +170,18 @@ void test_5()
     pool.restart(5);
     std::cout << "Pool restarted\n";
 
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::highest, highest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::low, low_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::high, high_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::normal, normal_prio);
-    pool.do_job(priority::lowest, lowest_prio);
-    pool.do_job(priority::high, high_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::highest, highest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::low, low_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::high, high_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::normal, normal_prio);
+    pool.do_job(sync::priority::lowest, lowest_prio);
+    pool.do_job(sync::priority::high, high_prio);
 
     std::this_thread::sleep_for(std::chrono::seconds(1));
     pool.force_join();
@@ -193,20 +193,20 @@ void test_5()
 
 void test_6()
 {
-    thread_pool pool(2);
+    sync::thread_pool pool(2);
     
-    pool.store_job(priority::normal, normal_prio);
-    pool.store_job(priority::high, high_prio);
-    pool.store_job(priority::highest, highest_prio);
-    pool.store_job(priority::normal, normal_prio);
-    pool.store_job(priority::low, low_prio);
-    pool.store_job(priority::normal, normal_prio);
-    pool.store_job(priority::normal, normal_prio);
-    pool.store_job(priority::high, high_prio);
-    pool.store_job(priority::lowest, lowest_prio);
-    pool.store_job(priority::normal, normal_prio);
-    pool.store_job(priority::lowest, lowest_prio);
-    pool.store_job(priority::high, high_prio);
+    pool.store_job(sync::priority::normal, normal_prio);
+    pool.store_job(sync::priority::high, high_prio);
+    pool.store_job(sync::priority::highest, highest_prio);
+    pool.store_job(sync::priority::normal, normal_prio);
+    pool.store_job(sync::priority::low, low_prio);
+    pool.store_job(sync::priority::normal, normal_prio);
+    pool.store_job(sync::priority::normal, normal_prio);
+    pool.store_job(sync::priority::high, high_prio);
+    pool.store_job(sync::priority::lowest, lowest_prio);
+    pool.store_job(sync::priority::normal, normal_prio);
+    pool.store_job(sync::priority::lowest, lowest_prio);
+    pool.store_job(sync::priority::high, high_prio);
 
     std::cout << "Pool stored some jobs " << pool.stored_jobs() << '\n';
 
@@ -217,10 +217,10 @@ void test_6()
 
 void test_7()
 {
-    thread_pool pool(2);
+    sync::thread_pool pool(2);
     
-    auto ret1 = pool.do_job(priority::high, foo_return);
-    auto ret2 = pool.do_job(priority::normal, foo_except_ok);
+    auto ret1 = pool.do_job(sync::priority::high, foo_return);
+    auto ret2 = pool.do_job(sync::priority::normal, foo_except_ok);
 
     try
     {

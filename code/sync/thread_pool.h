@@ -14,6 +14,9 @@
 #include "_Core.h"
 
 
+SYNC_BEGIN
+
+
 /**
  * @brief Enum for job priority in thread_pool internal queue
  * @note Priority might change based on wait time
@@ -564,3 +567,6 @@ private:
         }
     }
 };  // END thread_pool
+
+
+SYNC_END

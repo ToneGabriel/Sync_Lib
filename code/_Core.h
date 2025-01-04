@@ -30,3 +30,6 @@ inline void __Assert(bool expr, const char* msg, const char* expected, const cha
 
 #define DETAIL_BEGIN namespace detail {
 #define DETAIL_END }
+
+#define SYNC_BEGIN namespace sync {
+#define SYNC_END }

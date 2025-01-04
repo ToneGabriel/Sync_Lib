@@ -1,6 +1,7 @@
 #pragma once
 
-#include "../thread_pool/thread_pool.h"
+#include "../sync/thread_pool.h"
+#include "../sync/multilogger.h"
 
 void test_1();
 void test_2();
