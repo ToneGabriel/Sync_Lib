@@ -9,9 +9,7 @@
 
 SYNC_BEGIN
 
-
 DETAIL_BEGIN
-
 
 /**
  * @brief Class that manages multiple output streams in a threadsafe manner
@@ -69,6 +67,17 @@ public:
     }
 
     /**
+     * @brief Check if ostream list is empty
+     * @return `true` if empty
+     */
+    bool empty() const
+    {
+        std::lock_guard lock(_mtx);
+
+        return _ostreams.empty();
+    }
+
+    /**
      * @brief Outputs the data to each stream
      * @param data The output of the streams
      */
@@ -107,7 +116,6 @@ public:
     }
 };  // END _multilogger_impl
 
-
 DETAIL_END
 
 /// @brief Specialization for @c char stream
@@ -115,6 +123,5 @@ using multilogger = detail::_multilogger_impl<char>;
 
 /// @brief Specialization for @c wchar_t stream
 using wmultilogger = detail::_multilogger_impl<wchar_t>;
-
 
 SYNC_END

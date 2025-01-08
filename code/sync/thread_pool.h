@@ -16,7 +16,6 @@
 
 SYNC_BEGIN
 
-
 /**
  * @brief Enum for job priority in thread_pool internal queue
  * @note Priority might change based on wait time
@@ -29,7 +28,6 @@ enum class priority : uint8_t
     low     = UINT8_MAX / 4 * 3,
     lowest  = UINT8_MAX
 };  // END priority
-
 
 DETAIL_BEGIN
 
@@ -157,7 +155,6 @@ inline bool operator<(const _priority_job& left, const _priority_job& right)
 
 DETAIL_END
 
-
 /**
  * @brief Class that manages multiple tasks in paralel in an ordered and threadsafe manner
  */
@@ -223,7 +220,7 @@ public:
      * @brief Construct a new thread pool object with given number of threads
      * @param nthreads given number of threads
      */
-    thread_pool(const size_t nthreads)
+    thread_pool(size_t nthreads)
     {
         restart(nthreads);
     }
@@ -347,7 +344,7 @@ public:
      * @param nthreads new number of threads
      * @note Pause state is kept
      */
-    void restart(const size_t nthreads)
+    void restart(size_t nthreads)
     {
         if (is_paused())
         {
@@ -504,17 +501,14 @@ private:
      * @brief Create a number of threads
      * @param nthreads threads to create
      */
-    void _start(const size_t nthreads)
+    void _start(size_t nthreads)
     {
         _ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
 
         _joined.store(false, std::memory_order::relaxed);
 
-        for (size_t i = 0; i < nthreads; ++i)
-        {
-            std::jthread t = std::jthread(std::bind(&thread_pool::_worker_thread, this));
-            _threads.push_back(std::move(t));
-        }
+        while (nthreads--)
+            _threads.push_back(std::jthread(std::bind(&thread_pool::_worker_thread, this)));
     }
 
     /**
@@ -567,6 +561,5 @@ private:
         }
     }
 };  // END thread_pool
-
 
 SYNC_END
