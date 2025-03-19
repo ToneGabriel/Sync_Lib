@@ -11,7 +11,7 @@
 #include <utility>
 #include <functional>
 
-#include "_Core.h"
+#include "_sync_core.h"
 
 
 SYNC_BEGIN
@@ -181,14 +181,19 @@ private:
     std::vector<std::jthread> _threads;
 
     /**
-     * @brief Thread safety mutex of this pool
+     * @brief Thread safety for queued jobs
      */
-    mutable std::mutex _poolMtx;
+    mutable std::mutex _pendingJobsMtx;
+
+    /**
+     * @brief Thread safety for stored jobs
+     */
+    mutable std::mutex _storedJobsMtx;
 
     /**
      * @brief Condition Variable for job start notification
      */
-    mutable std::condition_variable _poolCV;
+    mutable std::condition_variable _pendingJobsCV;
 
     /**
      * @brief Counts jobs done until pool is destroyed
@@ -269,7 +274,7 @@ public:
      */
     size_t pending_jobs() const
     {
-        std::lock_guard lock(_poolMtx);
+        std::lock_guard lock(_pendingJobsMtx);
 
         return _pendingJobs.size();   
     }
@@ -279,7 +284,7 @@ public:
      */
     void clear_pending_jobs()
     {
-        std::lock_guard lock(_poolMtx);
+        std::lock_guard lock(_pendingJobsMtx);
 
         while (!_pendingJobs.empty())
             _pendingJobs.pop();
@@ -291,7 +296,7 @@ public:
      */
     size_t stored_jobs() const
     {
-        std::lock_guard lock(_poolMtx);
+        std::lock_guard lock(_storedJobsMtx);
 
         return _storedJobs.size();
     }
@@ -301,7 +306,7 @@ public:
      */
     void clear_stored_jobs()
     {
-        std::lock_guard lock(_poolMtx);
+        std::lock_guard lock(_storedJobsMtx);
 
         _storedJobs.clear();
     }
@@ -336,7 +341,7 @@ public:
     void resume()
     {
         _paused.store(false, std::memory_order::relaxed);
-        _poolCV.notify_all();
+        _pendingJobsCV.notify_all();
     }
 
     /**
@@ -408,12 +413,12 @@ public:
 
         // Move it on the queue (wrapped in a lambda)
         {
-            std::lock_guard lock(_poolMtx);
+            std::lock_guard lock(_pendingJobsMtx);
             _pendingJobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
         }
 
         // Unblock a thread
-        _poolCV.notify_one();
+        _pendingJobsCV.notify_one();
 
         return safeJobPtr->get_future();
     }
@@ -452,8 +457,11 @@ public:
         auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
                             std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
 
-        // Move it on the vector (wrapped in a lambda) (no lock needed)
-        _storedJobs.emplace_back(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+        // Move it on the vector (wrapped in a lambda)
+        {
+            std::lock_guard lock(_storedJobsMtx);
+            _storedJobs.emplace_back(prio, [safeJobPtr]() { (*safeJobPtr)(); });
+        }
 
         return safeJobPtr->get_future();
     }
@@ -480,7 +488,8 @@ public:
     void flush_job_storage()
     {
         {
-            std::lock_guard lock(_poolMtx);
+            std::lock_guard lock1(_pendingJobsMtx);
+            std::lock_guard lock2(_storedJobsMtx);
 
             // Move jobs to the execution queue
             while (!_storedJobs.empty())
@@ -491,7 +500,7 @@ public:
         }
 
         // Notify all threads to stop waiting for job
-        _poolCV.notify_all();
+        _pendingJobsCV.notify_all();
     }
 
 private:
@@ -518,7 +527,7 @@ private:
     {
         // Notify all threads to stop waiting for job
         _joined.store(true, std::memory_order::relaxed);
-        _poolCV.notify_all();
+        _pendingJobsCV.notify_all();
 
         // Destroy thread objects
         // Threads will exit the loop and will join here automatically
@@ -535,12 +544,12 @@ private:
         for (;;)
         {
             {   // Empty scope start -> mutex lock and job decision
-                std::unique_lock<std::mutex> lock(_poolMtx);
+                std::unique_lock<std::mutex> lock(_pendingJobsMtx);
 
                 // Pool is working, but it's paused or there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
                 while (!is_joined() && (is_paused() || _pendingJobs.empty()))
-                    _poolCV.wait(lock);
+                    _pendingJobsCV.wait(lock);
 
                 // Pool is joined
                 // Threads finish jobs first if not paused
