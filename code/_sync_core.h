@@ -5,7 +5,7 @@
 #include <climits>      // numeric limits
 #include <iostream>     // debugging
 
-#include "Config.hpp"   // project configuration
+#include "_sync_config.hpp"   // project configuration
 
 
 inline void __Assert(bool expr, const char* msg, const char* expected, const char* file, int line)

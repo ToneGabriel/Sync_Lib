@@ -411,6 +411,12 @@ public:
         auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
                             std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
 
+        // auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
+        //     [func = std::forward<Functor>(func), ...args = std::forward<Args>(args)]() mutable
+        //     {
+        //         return std::invoke(func, std::forward<Args>(args)...);
+        //     });
+
         // Move it on the queue (wrapped in a lambda)
         {
             std::lock_guard lock(_pendingJobsMtx);
