@@ -45,20 +45,19 @@ enum class functor_type
 // Tests
 // ======================================================================================================================
 
-// TEST(ThreadPoolConstructor, default_constructor)
-// {
-//     sync::thread_pool tp;
+TEST(ThreadPoolConstructor, default_constructor)
+{
+    sync::thread_pool tp;
 
-//     EXPECT_EQ(tp.thread_count(), std::thread::hardware_concurrency());
-// }
+    EXPECT_EQ(tp.thread_count(), std::thread::hardware_concurrency());
+}
 
-// TEST(ThreadPoolConstructor, thread_count_constructor)
-// {
-//     sync::thread_pool tp(5);
+TEST(ThreadPoolConstructor, thread_count_constructor)
+{
+    sync::thread_pool tp(5);
 
-//     EXPECT_EQ(tp.thread_count(), 5);
-// }
-
+    EXPECT_EQ(tp.thread_count(), 5);
+}
 
 // ======================================================================================================================
 // Job queue init tests

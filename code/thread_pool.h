@@ -408,16 +408,20 @@ public:
         using _ReturnType = std::invoke_result_t<Functor, Args...>;
 
         // Create a packaged_task for the job
-        auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
-                            std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
+        // Args are now bound inside lambda
+        auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>
+                                                (
+                                                    [
+                                                        func = std::forward<Functor>(func),
+                                                        ...args = std::forward<Args>(args)
+                                                    ]
+                                                    (void) mutable -> _ReturnType
+                                                    {
+                                                        return std::invoke(func, std::forward<Args>(args)...);
+                                                    }
+                                                );
 
-        // auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
-        //     [func = std::forward<Functor>(func), ...args = std::forward<Args>(args)]() mutable
-        //     {
-        //         return std::invoke(func, std::forward<Args>(args)...);
-        //     });
-
-        // Move it on the queue (wrapped in a lambda)
+        // Move the packaged_task on the queue (wrapped in a lambda)
         {
             std::lock_guard lock(_pendingJobsMtx);
             _pendingJobs.emplace(prio, [safeJobPtr]() { (*safeJobPtr)(); });
@@ -460,10 +464,20 @@ public:
         using _ReturnType = std::invoke_result_t<Functor, Args...>;
 
         // Create a packaged_task for the job
-        auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>(
-                            std::bind(std::forward<Functor>(func), std::forward<Args>(args)...));
+        // Args are now bound inside lambda
+        auto safeJobPtr = std::make_shared<std::packaged_task<_ReturnType(void)>>
+                                                (
+                                                    [
+                                                        func = std::forward<Functor>(func),
+                                                        ...args = std::forward<Args>(args)
+                                                    ]
+                                                    (void) mutable -> _ReturnType
+                                                    {
+                                                        return std::invoke(func, std::forward<Args>(args)...);
+                                                    }
+                                                );
 
-        // Move it on the vector (wrapped in a lambda)
+        // Move the packaged_task on the vector (wrapped in a lambda)
         {
             std::lock_guard lock(_storedJobsMtx);
             _storedJobs.emplace_back(prio, [safeJobPtr]() { (*safeJobPtr)(); });
@@ -522,8 +536,10 @@ private:
 
         _joined.store(false, std::memory_order::relaxed);
 
+        auto worker = [this](void) { this->_worker_thread(); };
+
         while (nthreads--)
-            _threads.push_back(std::jthread(std::bind(&thread_pool::_worker_thread, this)));
+            _threads.push_back(std::jthread(worker));
     }
 
     /**
