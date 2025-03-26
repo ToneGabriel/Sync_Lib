@@ -92,13 +92,27 @@ protected:
     }
 };  // END ThreadPoolQueueInitFixture
 
-TEST_F(ThreadPoolQueueInitFixture, restart)
+TEST_F(ThreadPoolQueueInitFixture, restart_not_paused)
 {
     EXPECT_EQ(this->_thread_pool_instance.thread_count(), 2);
+    EXPECT_FALSE(this->_thread_pool_instance.is_paused());
 
     this->_thread_pool_instance.restart(5);
-    EXPECT_NE(this->_thread_pool_instance.pending_jobs(), 0);
     EXPECT_EQ(this->_thread_pool_instance.thread_count(), 5);
+    EXPECT_FALSE(this->_thread_pool_instance.is_paused());
+}
+
+TEST_F(ThreadPoolQueueInitFixture, restart_paused)
+{
+    EXPECT_EQ(this->_thread_pool_instance.thread_count(), 2);
+    EXPECT_FALSE(this->_thread_pool_instance.is_paused());
+
+    this->_thread_pool_instance.pause();
+    EXPECT_TRUE(this->_thread_pool_instance.is_paused());
+
+    this->_thread_pool_instance.restart(5);
+    EXPECT_EQ(this->_thread_pool_instance.thread_count(), 5);
+    EXPECT_TRUE(this->_thread_pool_instance.is_paused());
 }
 
 TEST_F(ThreadPoolQueueInitFixture, do_job)
@@ -219,8 +233,14 @@ TEST_F(ThreadPoolStoreInitFixture, flush_job_storage)
     EXPECT_EQ(this->_thread_pool_instance.stored_jobs(), 4);
 
     this->_thread_pool_instance.flush_job_storage();
+    
     EXPECT_NE(this->_thread_pool_instance.pending_jobs(), 0);
     EXPECT_EQ(this->_thread_pool_instance.stored_jobs(), 0);
+
+    EXPECT_NO_THROW(this->_result_list[functor_type::e_default_no_return_no_except].get());
+    EXPECT_THROW(this->_result_list[functor_type::e_default_throw_std_out_of_range_exception].get(), std::out_of_range);
+    EXPECT_NO_THROW(this->_result_list[functor_type::e_callable_object].get());
+    EXPECT_NO_THROW(this->_result_list[functor_type::e_member_function].get());
 }
 
 TEST_F(ThreadPoolStoreInitFixture, clear_stored_jobs)
@@ -231,4 +251,9 @@ TEST_F(ThreadPoolStoreInitFixture, clear_stored_jobs)
     this->_thread_pool_instance.clear_stored_jobs();
     EXPECT_EQ(this->_thread_pool_instance.pending_jobs(), 0);
     EXPECT_EQ(this->_thread_pool_instance.stored_jobs(), 0);
+
+    EXPECT_THROW(this->_result_list[functor_type::e_default_no_return_no_except].get(), std::future_error);
+    EXPECT_THROW(this->_result_list[functor_type::e_default_throw_std_out_of_range_exception].get(), std::future_error);
+    EXPECT_THROW(this->_result_list[functor_type::e_callable_object].get(), std::future_error);
+    EXPECT_THROW(this->_result_list[functor_type::e_member_function].get(), std::future_error);
 }
