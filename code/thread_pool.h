@@ -8,7 +8,7 @@
 #include <queue>
 #include <vector>
 
-#include "_sync_core.h"
+#include "binder.h"
 
 
 SYNC_BEGIN
@@ -64,10 +64,7 @@ public:
     _priority_job(priority prio, std::function<void(void)>&& job)
         :   _prio(prio),
             _job(std::move(job)),
-            _timestamp(std::chrono::steady_clock::now())
-    {
-        // Empty
-    }
+            _timestamp(std::chrono::steady_clock::now()) { /* Empty */ }
 
     /**
      * @brief Default destructor
@@ -158,19 +155,19 @@ DETAIL_END
 class thread_pool
 {
 private:
-    using _priority_job = detail::_priority_job;
+    using _Job_t = detail::_priority_job;
 
 private:
 
     /**
      * @brief Priority queue for jobs
      */
-    std::priority_queue<_priority_job> _pendingJobs;
+    std::priority_queue<_Job_t> _pendingJobs;
 
     /**
      * @brief Vector to store jobs that are not yet in queue
      */
-    std::vector<_priority_job> _storedJobs;
+    std::vector<_Job_t> _storedJobs;
 
     /**
      * @brief Dynamic container for threads. Also join automatically when destroyed
@@ -193,7 +190,7 @@ private:
     mutable std::condition_variable _pendingJobsCV;
 
     /**
-     * @brief Counts jobs done until pool is destroyed
+     * @brief Lifetime counter for jobs done
      */
     std::atomic_size_t _jobsDone = 0;
 
@@ -238,8 +235,8 @@ public:
     /**
      * @brief Delete copy/move constructors
      */
-    thread_pool(const thread_pool&)             = delete;
-    thread_pool(thread_pool&&)                  = delete;
+    thread_pool(const thread_pool&) = delete;
+    thread_pool(thread_pool&&)      = delete;
 
     /**
      * @brief Delete copy/move operators
@@ -370,13 +367,13 @@ public:
     }
 
     /**
-     * @brief Join threads, but NOT before finishing ALL jobs
+     * @brief Join threads, but NOT before finishing ALL pending jobs
      * @note Use `restart()` to create new threads
      */
     void join()
     {
         resume();               // ensure the pool is not paused
-        _join_threads_impl();   // threads join after ALL jobs are done
+        _join_threads_impl();   // threads join after ALL pending jobs are done
     }
 
     /**
@@ -403,20 +400,22 @@ public:
     template<class Functor, class... Args>
     std::future<std::invoke_result_t<Functor, Args...>> do_job(priority prio, Functor&& func, Args&&... args)
     {
-        // Create a share_ptr of a packaged_task for the job
-        auto safeJobPtr =
-                _get_packaged_task_shared_ptr(std::forward<Functor>(func), std::forward<Args>(args)...);
+        // Bind functor and args into a single object as pointer
+        auto taskPtr =
+            std::make_shared<sync::binder<Functor, Args...>>
+                (std::forward<Functor>(func), std::forward<Args>(args)...);
 
-        // Move it on the queue (wrapped in a lambda to match _priority_job signature)
+        // Move it on the queue (wrapped in a lambda to match _Job_t signature)
         {
             std::lock_guard lock(_pendingJobsMtx);
-            _pendingJobs.emplace(prio, [safeJobPtr](void) { return (*safeJobPtr)(); });
+            _pendingJobs.emplace(prio, [taskPtr](void) { return (*taskPtr)(); });
         }
 
         // Unblock a thread
         _pendingJobsCV.notify_one();
 
-        return safeJobPtr->get_future();
+        // Return the future of the job's result
+        return taskPtr->get_future();
     }
 
     /**
@@ -447,17 +446,19 @@ public:
     template<class Functor, class... Args>
     std::future<std::invoke_result_t<Functor, Args...>> store_job(priority prio, Functor&& func, Args&&... args)
     {
-        // Create a share_ptr of a packaged_task for the job
-        auto safeJobPtr =
-                _get_packaged_task_shared_ptr(std::forward<Functor>(func), std::forward<Args>(args)...);
+        // Bind functor and args into a single object as pointer
+        auto taskPtr =
+            std::make_shared<sync::binder<Functor, Args...>>
+                (std::forward<Functor>(func), std::forward<Args>(args)...);
 
-        // Move it on the vector (wrapped in a lambda to match _priority_job signature)
+        // Move it on the vector (wrapped in a lambda to match _Job_t signature)
         {
             std::lock_guard lock(_storedJobsMtx);
-            _storedJobs.emplace_back(prio, [safeJobPtr](void) { return (*safeJobPtr)(); });
+            _storedJobs.emplace_back(prio, [taskPtr](void) { return (*taskPtr)(); });
         }
 
-        return safeJobPtr->get_future();
+        // Return the future of the job's result
+        return taskPtr->get_future();
     }
 
     /**
@@ -481,7 +482,7 @@ public:
      */
     void flush_job_storage()
     {
-        {
+        {   // Lock both mutexes and work
             std::lock_guard lock1(_pendingJobsMtx);
             std::lock_guard lock2(_storedJobsMtx);
 
@@ -491,7 +492,7 @@ public:
                 _pendingJobs.emplace(std::move(_storedJobs.back()));
                 _storedJobs.pop_back();
             }
-        }
+        }   // Unlock
 
         // Notify all threads to stop waiting for job
         _pendingJobsCV.notify_all();
@@ -499,6 +500,59 @@ public:
 
 private:
     // Helpers
+
+    /**
+     * @brief Setter for pause flag
+     * @param val state to be set
+     */
+    void _set_pause_flag(bool val) noexcept
+    {
+        _pauseFlag.store(val, std::memory_order::relaxed);
+    }
+
+    /**
+     * @brief Getter for pause flag
+     * @return true, false
+     */
+    bool _get_pause_flag() const noexcept
+    {
+        return _pauseFlag.load(std::memory_order::relaxed);
+    }
+
+    /**
+     * @brief Setter for join flag
+     * @param val state to be set
+     */
+    void _set_join_flag(bool val) noexcept
+    {
+        _joinFlag.store(val, std::memory_order::relaxed);
+    }
+
+    /**
+     * @brief Getter for join flag
+     * @return true, false
+     */
+    bool _get_join_flag() const noexcept
+    {
+        return _joinFlag.load(std::memory_order::relaxed);
+    }
+
+    /**
+     * @brief Increment counter of jobs done
+     */
+    void _increment_jobs_done() noexcept
+    {
+        _jobsDone.fetch_add(1, std::memory_order::relaxed);
+    }
+
+    /**
+     * @brief Getter for jobs done counter
+     * @return size_t
+     */
+    size_t _get_jobs_done() const noexcept
+    {
+        return _jobsDone.load(std::memory_order::relaxed);
+    }
 
     /**
      * @brief Create a number of threads
@@ -517,7 +571,7 @@ private:
     /**
      * @brief Signal threads the pool is closed, then join
      */
-    void _join_threads_impl()
+    void _join_threads_impl() noexcept
     {
         // Notify all threads to stop waiting for job
         _set_join_flag(true);
@@ -529,87 +583,11 @@ private:
     }
 
     /**
-     * @brief Setter for pause flag
-     * @param val state to be set
-     */
-    void _set_pause_flag(bool val)
-    {
-        _pauseFlag.store(val, std::memory_order::relaxed);
-    }
-
-    /**
-     * @brief Getter for pause flag
-     * @return true, false
-     */
-    bool _get_pause_flag() const
-    {
-        return _pauseFlag.load(std::memory_order::relaxed);
-    }
-
-    /**
-     * @brief Setter for join flag
-     * @param val state to be set
-     */
-    void _set_join_flag(bool val)
-    {
-        _joinFlag.store(val, std::memory_order::relaxed);
-    }
-
-    /**
-     * @brief Getter for join flag
-     * @return true, false
-     */
-    bool _get_join_flag() const
-    {
-        return _joinFlag.load(std::memory_order::relaxed);
-    }
-
-    /**
-     * @brief Increment counter of jobs done
-     */
-    void _increment_jobs_done()
-    {
-        _jobsDone.fetch_add(1, std::memory_order::relaxed);
-    }
-
-    /**
-     * @brief Getter for jobs done counter
-     * @return size_t
-     */
-    size_t _get_jobs_done() const
-    {
-        return _jobsDone.load(std::memory_order::relaxed);
-    }
-
-    /**
-     * @brief Create a safe callable ptr that binds the functor to arguments
-     * @tparam Functor type of the function object
-     * @tparam Args types of the arguments of the function object
-     * @param func function object to be called
-     * @param args arguments for the call
-     * @return A `shared_ptr` of a `packaged_task` with return type the `invoke_result` type of the call
-     */
-    template<class Functor, class... Args>
-    std::shared_ptr<
-        std::packaged_task<
-            std::invoke_result_t<Functor, Args...>(void)>> _get_packaged_task_shared_ptr(Functor&& func, Args&&... args) const
-    {
-        using _ReturnType = std::invoke_result_t<Functor, Args...>;
-
-        // Callable data is now bound to lambda
-        auto boundJob = [func = std::forward<Functor>(func), ...args = std::forward<Args>(args)]
-                        (void) mutable -> _ReturnType
-                        { return std::invoke(func, args...); };
-
-        return std::make_shared<std::packaged_task<_ReturnType(void)>>(std::move(boundJob));
-    }
-
-    /**
      * @brief Function used by threads. Here is where all the work is done
      */
     void _worker_thread()
     {
-        _priority_job job;
+        _Job_t job;
 
         for (;;)
         {
@@ -622,13 +600,13 @@ private:
                     _pendingJobsCV.wait(lock);
 
                 // Pool is joined
-                // Threads finish jobs first if not paused
+                // Threads finish pending jobs first if not paused
                 if (_get_pause_flag() || _pendingJobs.empty())
                     return;
 
                 // Pool is working/joined, not paused and jobs are available
                 // Assign job to thread from queue
-                job = std::move(const_cast<_priority_job&>(_pendingJobs.top()));
+                job = std::move(const_cast<_Job_t&>(_pendingJobs.top()));
                 _pendingJobs.pop();
             }   // Empty scope end -> unlock, can start job
 
