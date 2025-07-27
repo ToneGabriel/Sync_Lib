@@ -2,7 +2,8 @@
 #include <gmock/gmock.h>
 
 #include <unordered_map>
-#include "thread_pool.h"
+
+#include "sync/thread_pool.h"
 
 
 // Helpers

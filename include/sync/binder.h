@@ -3,7 +3,7 @@
 #include <functional>
 #include <future>
 
-#include "_sync_core.h"
+#include "sync/_sync_core.h"
 
 
 SYNC_BEGIN

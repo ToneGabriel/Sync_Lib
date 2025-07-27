@@ -22,16 +22,38 @@ set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
 set(TEST_LIBRARY_NAME       "SyncTestLibrary")
 set(TEST_EXECUTABLE_NAME    "SyncTest")
 
-# Create project library (link executable and other cpp files to this)
-add_library(${TEST_LIBRARY_NAME} STATIC)
+# Create project library
+add_library(${TEST_LIBRARY_NAME} INTERFACE)
+target_include_directories(${TEST_LIBRARY_NAME} INTERFACE ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-# CMakeLists subdirectory config
-add_subdirectory(config)
-add_subdirectory(code)
-add_subdirectory(test)
+# create test executable
+add_executable(${TEST_EXECUTABLE_NAME}
+    test/main.cpp
+    test/thread_pool_test.cpp
+    test/multilogger_test.cpp
+)
+
+# get googletest project
+include(FetchContent)
+FetchContent_Declare(
+    googletest
+    GIT_REPOSITORY https://github.com/google/googletest.git
+    GIT_TAG main
+)
+
+# disable googletest installation
+set(INSTALL_GTEST OFF CACHE BOOL "Disable installation of googletest" FORCE)
+
+FetchContent_MakeAvailable(googletest)
+
+# link to executable the following - test library, gtest, gmock
+target_link_libraries(${TEST_EXECUTABLE_NAME} PUBLIC ${TEST_LIBRARY_NAME} gtest gmock)
+
 
 # CPack settings
-set(CPACK_GENERATOR "ZIP")
-set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
-set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
-include(CPack)
+# set(CPACK_GENERATOR "ZIP")
+# set(CPACK_PACKAGE_NAME ${PROJECT_NAME})
+# set(CPACK_PACKAGE_VERSION ${PROJECT_VERSION})
+# include(CPack)
+
+# install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} DESTINATION include FILES_MATCHING PATTERN "*.h")

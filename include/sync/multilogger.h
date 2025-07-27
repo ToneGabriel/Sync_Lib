@@ -4,7 +4,7 @@
 #include <unordered_set>
 #include <mutex>
 
-#include "_sync_core.h"
+#include "sync/_sync_core.h"
 
 
 SYNC_BEGIN

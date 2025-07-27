@@ -3,7 +3,8 @@
 
 #include <sstream>
 #include <thread>
-#include "multilogger.h"
+
+#include "sync/multilogger.h"
 
 // ======================================================================================================================
 // Tests
