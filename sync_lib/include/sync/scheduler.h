@@ -158,10 +158,32 @@ private:
     mutable std::mutex                          _pendingJobsMtx;
     mutable std::condition_variable             _pendingJobsCV;
 
+    bool _stop          = false;
+    bool _forcedStop    = false;
+
+    std::atomic_size_t _jobsDone = 0;
+
 public:
     scheduler() = default;
 
+    ~scheduler();
+
     void post();
+
+    void stop()
+    {
+        std::lock_guard lock(_pendingJobsMtx);
+        _stop = true;
+        _pendingJobsCV.notify_all();
+    }
+
+    void forced_stop()
+    {
+        std::lock_guard lock(_pendingJobsMtx);
+        _stop       = true;
+        _forcedStop = true;
+        _pendingJobsCV.notify_all();
+    }
 
     void run()
     {
@@ -172,17 +194,17 @@ public:
             {   // Empty scope start -> mutex lock and job decision
                 std::unique_lock<std::mutex> lock(_pendingJobsMtx);
 
-                // Pool is working (not joined), but is paused or there are no jobs -> wait
+                // Pool is working (not stoped), but there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
-                while (!_get_join_flag() && _pendingJobs.empty())
+                while (!_stop && _pendingJobs.empty())
                     _pendingJobsCV.wait(lock);
 
-                // Pool is joined
-                // Threads finish pending jobs first if not paused
-                if (_pendingJobs.empty())
+                // Pool is stoped
+                // Threads finish pending jobs first if not forced to stop
+                if (_forcedStop || _pendingJobs.empty())
                     return;
 
-                // Pool is working/joined, not paused and jobs are available
+                // Pool is working/stoped, not forced to stop and jobs are available
                 // Assign job to thread from queue
                 job = std::move(const_cast<detail::_priority_job&>(_pendingJobs.top()));
                 _pendingJobs.pop();
@@ -192,13 +214,27 @@ public:
             job();
 
             // Count work done (even if throws)
-            // _increment_jobs_done();
+            _increment_jobs_done();
         }
     }
 
-    void stop()
+private:
+
+    /**
+     * @brief Increment counter of jobs done
+     */
+    void _increment_jobs_done() noexcept
     {
-        
+        _jobsDone.fetch_add(1, std::memory_order::relaxed);
+    }
+
+    /**
+     * @brief Getter for jobs done counter
+     * @return size_t
+     */
+    size_t _get_jobs_done() const noexcept
+    {
+        return _jobsDone.load(std::memory_order::relaxed);
     }
 
 };  // END scheduler
