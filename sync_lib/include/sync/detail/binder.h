@@ -3,10 +3,12 @@
 #include <functional>
 #include <future>
 
-#include "sync/_sync_core.h"
+#include "sync/detail/core.h"
 
 
 SYNC_BEGIN
+DETAIL_BEGIN
+
 
 /**
  * @brief Class to store a functor and its arguments
@@ -17,25 +19,19 @@ template<class Functor, class... Args>
 class binder
 {
 public:
-    /**
-     * @brief Type of the return value from call
-     */
+
+    // Type of the return value from call
     using return_type = std::invoke_result_t<Functor, Args...>;
 
 private:
-    /**
-     * @brief Stored functor
-     */
+
+    // Stored functor
     std::decay_t<Functor> _functor;
 
-    /**
-     * @brief Stored arguments as tuple
-     */
+    // Stored arguments as tuple
     std::tuple<std::decay_t<Args>...> _boundArgs;
 
-    /**
-     * @brief Promise to get future later with the result
-     */
+    // Promise to get future later with the result
     std::promise<return_type> _promise;
 
 public:
@@ -92,4 +88,6 @@ public:
     }
 };  // END binder
 
+
+DETAIL_END
 SYNC_END
