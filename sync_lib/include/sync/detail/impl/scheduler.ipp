@@ -19,6 +19,12 @@ void scheduler::post(detail::priority_job&& job)
 }
 
 
+size_t scheduler::jobs_done() const
+{
+    return _jobsDone;
+}
+
+
 void scheduler::stop()
 {
     std::lock_guard lock(_pendingJobsMtx);

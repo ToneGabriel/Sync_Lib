@@ -7,4 +7,5 @@ create_library(${SYNC_CPP_LIBRARY} INTERFACE CXX 20 ${CMAKE_CURRENT_SOURCE_DIR}/
 create_executable(${SYNC_CPP_FULL_TEST}
     "${SYNC_CPP_LIBRARY};gtest;gmock"
     test/main.cpp
+    test/thread_pool_test.cpp
 )

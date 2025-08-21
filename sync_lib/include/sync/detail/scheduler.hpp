@@ -39,6 +39,8 @@ public:
 
     void post(detail::priority_job&& job) override;
 
+    size_t jobs_done() const;
+
     void stop();
 
     void stop_now();
