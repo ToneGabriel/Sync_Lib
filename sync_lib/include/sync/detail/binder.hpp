@@ -3,7 +3,7 @@
 #include <functional>
 #include <future>
 
-#include "sync/detail/core.h"
+#include "sync/detail/core.hpp"
 
 
 SYNC_BEGIN
