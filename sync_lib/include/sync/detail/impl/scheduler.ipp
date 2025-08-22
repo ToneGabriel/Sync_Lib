@@ -25,6 +25,13 @@ size_t scheduler::jobs_done() const
 }
 
 
+bool scheduler::stopped() const
+{
+    std::lock_guard lock(_pendingJobsMtx);
+    return _stop;
+}
+
+
 void scheduler::stop()
 {
     std::lock_guard lock(_pendingJobsMtx);

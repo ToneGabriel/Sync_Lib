@@ -41,6 +41,8 @@ public:
 
     size_t jobs_done() const;
 
+    bool stopped() const;
+
     void stop();
 
     void stop_now();
