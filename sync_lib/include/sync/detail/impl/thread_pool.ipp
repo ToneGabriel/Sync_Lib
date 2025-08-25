@@ -6,7 +6,7 @@ SYNC_BEGIN
 
 thread_pool::thread_pool(size_t nthreads)
 {
-    _ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
+    _SYNC_ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
 
     _scheduler.restart();
     _threads.reserve(nthreads);

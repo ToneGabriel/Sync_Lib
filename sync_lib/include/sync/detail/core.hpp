@@ -22,9 +22,11 @@ inline void __Assert(bool expr, const char* msg, const char* expected, const cha
     }
 }
 
-#define _ASSERT(Expr, Msg) __Assert(Expr, Msg, #Expr, __FILE__, __LINE__)
-
-#define RERAISE throw    // used to terminate in a catch block
+#ifndef NDEBUG
+#   define _SYNC_ASSERT(Expr, Msg) __Assert(Expr, Msg, #Expr, __FILE__, __LINE__)
+#else
+#   define _SYNC_ASSERT(Expr, Msg) ((void)0)
+#endif
 
 #define DETAIL_BEGIN namespace detail {
 #define DETAIL_END }
