@@ -61,6 +61,9 @@ void scheduler::restart()
 
 void scheduler::run()
 {
+    if (stopped())  // blocks
+        return;
+
     detail::priority_job job;
 
     for (;;)

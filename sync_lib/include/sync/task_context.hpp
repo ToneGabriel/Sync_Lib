@@ -12,7 +12,7 @@ class task_context : public execution_context
 {
 private:
 
-    // Task basic_executor object 
+    // Basic executor for tasks
     detail::scheduler _scheduler;
 
 public:
@@ -23,14 +23,31 @@ public:
 
 public:
 
+    /**
+     * @brief Return a reference to the executor associated with the pool
+     */
     basic_executor& get_executor() override;
 
+    /**
+     * @brief Returns `true` if the executor is stopped, `false` otherwise.
+     */
     bool stopped() const;
 
+    /**
+     * @brief Allow new calls for `run()`
+     */
     void restart();
 
+    /**
+     * @brief Start tasks
+     */
     void run();
 
+    /**
+     * @brief Stop the executor. Pending jobs are no longer available.
+     * Running jobs will continue.
+     * Subsequent `run()` calls return immediately.
+     */
     void stop();
 };  // END task_context
 

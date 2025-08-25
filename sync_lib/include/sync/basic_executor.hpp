@@ -14,6 +14,7 @@ class basic_executor
 public:
     virtual ~basic_executor() = default;
     virtual void post(detail::priority_job&& job) = 0;
+    virtual bool stopped() const = 0;
 };  // END basic_executor
 
 

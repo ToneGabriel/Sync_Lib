@@ -43,6 +43,12 @@ size_t thread_pool::jobs_done() const
 }
 
 
+bool thread_pool::stopped() const
+{
+    return _scheduler.stopped();
+}
+
+
 void thread_pool::stop()
 {
     _scheduler.stop_now();
