@@ -23,10 +23,10 @@ private:
     std::priority_queue<detail::priority_job> _pendingJobs;
 
     // Safety mutex
-    std::mutex _pendingJobsMtx;
+    mutable std::mutex _pendingJobsMtx;
 
     // Condition variable for empty queue wait
-    std::condition_variable _pendingJobsCV;
+    mutable std::condition_variable _pendingJobsCV;
 
     // Finished tasks counter
     std::atomic_size_t _jobsDone = 0;
