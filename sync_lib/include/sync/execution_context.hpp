@@ -26,13 +26,15 @@ public:
 template<class Functor, class... Args>
 std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& context, priority prio, Functor&& func, Args&&... args)
 {
-    if (context.get_executor().stopped())
-        throw std::system_error(std::make_error_code(std::errc::operation_not_permitted), "Context executor is stopped.");
+    basic_executor& executor = context.get_executor();
+
+    if (executor.stopped())
+        throw std::system_error(std::make_error_code(std::errc::operation_not_permitted), "Context executor is stopped");
 
     auto taskPtr = std::make_shared<detail::binder<Functor, Args...>>
                         (std::forward<Functor>(func), std::forward<Args>(args)...);
 
-    context.get_executor().post(detail::priority_job(prio, [taskPtr](void) { return (*taskPtr)(); }));
+    executor.post(detail::priority_job(prio, [taskPtr](void) { return (*taskPtr)(); }));
 
     // Return the future of the job's result
     return taskPtr->get_future();
