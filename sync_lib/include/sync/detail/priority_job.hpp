@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_PRIORITY_JOB_HPP
+#define SYNC_DETAIL_PRIORITY_JOB_HPP
 
 #include <chrono>
 #include <functional>
@@ -104,3 +105,6 @@ SYNC_END
 
 
 #include "sync/detail/impl/priority_job.ipp"
+
+
+#endif  // SYNC_DETAIL_PRIORITY_JOB_HPP

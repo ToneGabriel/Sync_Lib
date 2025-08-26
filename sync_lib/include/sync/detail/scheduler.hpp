@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_SCHEDULER_HPP
+#define SYNC_DETAIL_SCHEDULER_HPP
 
 #include <thread>
 #include <mutex>
@@ -87,3 +88,6 @@ SYNC_END
 
 
 #include "sync/detail/impl/scheduler.ipp"
+
+
+#endif  // SYNC_DETAIL_SCHEDULER_HPP

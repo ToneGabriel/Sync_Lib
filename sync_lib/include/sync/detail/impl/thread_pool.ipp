@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_IMPL_THREAD_POOL_IPP
+#define SYNC_DETAIL_IMPL_THREAD_POOL_IPP
 
 #include "sync/thread_pool.hpp"
 
@@ -65,3 +66,6 @@ void thread_pool::join()
 
 
 SYNC_END
+
+
+#endif  // SYNC_DETAIL_IMPL_THREAD_POOL_IPP

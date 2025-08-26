@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_TASK_CONTEXT_HPP
+#define SYNC_TASK_CONTEXT_HPP
 
 
 #include "sync/detail/scheduler.hpp"
@@ -56,3 +57,6 @@ SYNC_END
 
 
 #include "sync/detail/impl/task_context.ipp"
+
+
+#endif  // SYNC_TASK_CONTEXT_HPP

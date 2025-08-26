@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_IMPL_TASK_CONTEXT_IPP
+#define SYNC_DETAIL_IMPL_TASK_CONTEXT_IPP
 
 #include "sync/task_context.hpp"
 
@@ -37,3 +38,6 @@ void task_context::stop()
 
 
 SYNC_END
+
+
+#endif  // SYNC_DETAIL_IMPL_TASK_CONTEXT_IPP

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_EXECUTION_CONTEXT_HPP
+#define SYNC_EXECUTION_CONTEXT_HPP
 
 #include "sync/basic_executor.hpp"
 
@@ -52,3 +53,5 @@ std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& cont
 
 
 SYNC_END
+
+#endif  // SYNC_EXECUTION_CONTEXT_HPP

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_CORE_HPP
+#define SYNC_DETAIL_CORE_HPP
 
 #include <cstddef>      // size_t, nullptr_t
 #include <stdexcept>    // exceptions
@@ -33,3 +34,5 @@ inline void __Assert(bool expr, const char* msg, const char* expected, const cha
 
 #define SYNC_BEGIN namespace sync {
 #define SYNC_END }
+
+#endif  // SYNC_DETAIL_CORE_HPP

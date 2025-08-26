@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_BASIC_EXECUTOR_HPP
+#define SYNC_BASIC_EXECUTOR_HPP
 
 #include <memory>
 
@@ -19,3 +20,5 @@ public:
 
 
 SYNC_END
+
+#endif  // SYNC_BASIC_EXECUTOR_HPP

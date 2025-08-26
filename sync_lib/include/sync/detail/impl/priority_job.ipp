@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_IMPL_PRIORITY_JOB_IPP
+#define SYNC_DETAIL_IMPL_PRIORITY_JOB_IPP
 
 #include "sync/detail/priority_job.hpp"
 
@@ -49,3 +50,6 @@ void priority_job::_move(priority_job&& other) noexcept
 
 DETAIL_END
 SYNC_END
+
+
+#endif  // SYNC_DETAIL_IMPL_PRIORITY_JOB_IPP

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_BINDER_HPP
+#define SYNC_DETAIL_BINDER_HPP
 
 #include <functional>
 #include <future>
@@ -91,3 +92,6 @@ public:
 
 DETAIL_END
 SYNC_END
+
+
+#endif  // SYNC_DETAIL_BINDER_HPP

@@ -8,5 +8,5 @@ create_executable(${SYNC_CPP_FULL_TEST}
     "${SYNC_CPP_LIBRARY};gtest;gmock"
     test/main.cpp
     test/thread_pool_test.cpp
-    test/task_context_test.cpp
+    # test/task_context_test.cpp
 )

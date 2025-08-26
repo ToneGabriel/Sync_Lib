@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_THREAD_POOL_HPP
+#define SYNC_THREAD_POOL_HPP
 
 #include <thread>
 #include <vector>
@@ -83,3 +84,5 @@ SYNC_END
 
 
 #include "sync/detail/impl/thread_pool.ipp"
+
+#endif  // SYNC_THREAD_POOL_HPP

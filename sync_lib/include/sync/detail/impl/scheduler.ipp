@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_IMPL_SCHEDULER_IPP
+#define SYNC_DETAIL_IMPL_SCHEDULER_IPP
 
 #include "sync/detail/scheduler.hpp"
 
@@ -100,3 +101,6 @@ void scheduler::run()
 
 DETAIL_END
 SYNC_END
+
+
+#endif  // SYNC_DETAIL_IMPL_SCHEDULER_IPP

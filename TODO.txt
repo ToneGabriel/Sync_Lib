@@ -1,0 +1,3 @@
+1. Fix detail::scheduler::run() to stop if no work is available
+2. Check task_context_test.cpp to verify test implementation
+3. Fix duplicate definitions
