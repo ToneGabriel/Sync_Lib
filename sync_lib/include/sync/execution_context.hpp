@@ -42,12 +42,12 @@ std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& cont
 
 
 /**
- * @brief Overloaded variant with normal priority
+ * @brief Overloaded variant with medium priority
  */
 template<class Functor, class... Args>
 std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& context, Functor&& func, Args&&... args)
 {
-    return post(context, priority::normal, std::forward<Functor>(func), std::forward<Args>(args)...);
+    return post(context, priority::medium, std::forward<Functor>(func), std::forward<Args>(args)...);
 }
 
 

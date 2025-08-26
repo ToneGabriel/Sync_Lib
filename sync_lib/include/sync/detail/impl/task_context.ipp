@@ -1,3 +1,5 @@
+#pragma once
+
 #include "sync/task_context.hpp"
 
 

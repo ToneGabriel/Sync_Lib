@@ -17,7 +17,7 @@ enum class priority : uint8_t
 {
     highest = 0,
     high    = UINT8_MAX / 4,
-    normal  = UINT8_MAX / 2,
+    medium  = UINT8_MAX / 2,
     low     = UINT8_MAX / 4 * 3,
     lowest  = UINT8_MAX
 };  // END priority

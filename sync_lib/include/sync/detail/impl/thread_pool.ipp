@@ -1,3 +1,5 @@
+#pragma once
+
 #include "sync/thread_pool.hpp"
 
 

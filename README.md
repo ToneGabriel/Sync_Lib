@@ -43,7 +43,7 @@ int main()
 
     // assign tasks to thread_pool and create std::futures for results
     auto res1 = sync::post(pool, sync::priority::high, simple_task);
-    auto res2 = sync::post(pool, simple_task);  // normal priority by default
+    auto res2 = sync::post(pool, simple_task);  // medium priority by default
     // ... any number of tasks
 
     // futures can block to wait for results

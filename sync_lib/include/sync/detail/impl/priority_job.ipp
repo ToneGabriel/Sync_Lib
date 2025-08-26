@@ -1,3 +1,5 @@
+#pragma once
+
 #include "sync/detail/priority_job.hpp"
 
 

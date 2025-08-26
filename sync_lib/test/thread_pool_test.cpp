@@ -43,7 +43,7 @@ protected:
 
 public:
     ThreadPoolFixture()
-        : _thread_pool_instance(1) {}
+        : _thread_pool_instance(1) {}   // just 1 thread
 
 };  // END ThreadPoolFixture
 
@@ -63,6 +63,7 @@ TEST_F(ThreadPoolFixture, jobs_done)
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait for pool to start a task from queue (join() directly might be too fast)
     this->_thread_pool_instance.join();
 
     EXPECT_EQ(this->_thread_pool_instance.jobs_done(), 2);
@@ -71,10 +72,12 @@ TEST_F(ThreadPoolFixture, jobs_done)
 
 TEST_F(ThreadPoolFixture, join)
 {
-    auto no_except_result = sync::post(this->_thread_pool_instance, _test_no_return_no_except);
-    this->_thread_pool_instance.join();
-    auto exception_result = sync::post(this->_thread_pool_instance, _test_no_return_no_except);
+    (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(100)); // wait for pool to start a task from queue (join() directly might be too fast)
+    this->_thread_pool_instance.join();
+
+    EXPECT_THROW((void)sync::post(this->_thread_pool_instance, _test_no_return_no_except), std::system_error);
     EXPECT_EQ(this->_thread_pool_instance.jobs_done(), 1);
 }
 
@@ -84,9 +87,9 @@ TEST_F(ThreadPoolFixture, stop)
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(50)); // wait for pool to start a task from queue (stop() directly might be too fast)
-    this->_thread_pool_instance.stop();                         // after 1 task is started, stop the pool (second task is canceled)
-    this->_thread_pool_instance.join();                         // wait for first task to finish
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));    // wait for pool to start a task from queue (stop() directly might be too fast)
+    this->_thread_pool_instance.stop();                             // after 1 task is started, stop the pool (second task is canceled)
+    this->_thread_pool_instance.join();                             // wait for first task to finish
 
     EXPECT_EQ(this->_thread_pool_instance.jobs_done(), 1);
 }

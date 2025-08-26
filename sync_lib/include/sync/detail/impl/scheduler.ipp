@@ -1,3 +1,5 @@
+#pragma once
+
 #include "sync/detail/scheduler.hpp"
 
 
