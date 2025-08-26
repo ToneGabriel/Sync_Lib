@@ -64,9 +64,6 @@ void scheduler::restart()
 
 void scheduler::run()
 {
-    if (stopped())  // blocks
-        return;
-
     detail::priority_job job;
 
     for (;;)
@@ -74,18 +71,24 @@ void scheduler::run()
         {   // Empty scope start -> mutex lock and job decision
             std::unique_lock<std::mutex> lock(_pendingJobsMtx);
 
-            // Pool is working (not stoped), but there are no jobs -> wait
-            // Safeguard against spurious wakeups (while instead of if)
-            while (!_stop && _pendingJobs.empty())
-                _pendingJobsCV.wait(lock);
+            if (_wait)
+            {
+                // Pool is working (not stoped), but there are no jobs -> wait
+                // Safeguard against spurious wakeups (while instead of if)
+                while (!_stop && _pendingJobs.empty())
+                    _pendingJobsCV.wait(lock);
 
-            // Pool is stoped
-            // Threads finish pending jobs first
-            if (_pendingJobs.empty())
-                return;
+                // Pool is stoped
+                // Threads finish pending jobs first
+                if (_pendingJobs.empty())
+                    return;
+            }
+            else
+            {
+                if (_stop || _pendingJobs.empty())
+                    return;
+            }
 
-            // Pool is working/stoped, not forced to stop and jobs are available
-            // Assign job to thread from queue
             job = std::move(const_cast<detail::priority_job&>(_pendingJobs.top()));
             _pendingJobs.pop();
         }   // Empty scope end -> unlock, can start job
