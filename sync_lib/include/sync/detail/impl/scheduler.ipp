@@ -71,7 +71,7 @@ void scheduler::run()
         {   // Empty scope start -> mutex lock and job decision
             std::unique_lock<std::mutex> lock(_pendingJobsMtx);
 
-            if (_wait)
+            // if (_wait)
             {
                 // Pool is working (not stoped), but there are no jobs -> wait
                 // Safeguard against spurious wakeups (while instead of if)
@@ -83,11 +83,11 @@ void scheduler::run()
                 if (_pendingJobs.empty())
                     return;
             }
-            else
-            {
-                if (_stop || _pendingJobs.empty())
-                    return;
-            }
+            // else
+            // {
+            //     if (_stop || _pendingJobs.empty())
+            //         return;
+            // }
 
             job = std::move(const_cast<detail::priority_job&>(_pendingJobs.top()));
             _pendingJobs.pop();
