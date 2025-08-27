@@ -25,33 +25,18 @@ public:
  * @throw `std::system_error` if the context executor is stopped
  */
 template<class Functor, class... Args>
-std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& context, priority prio, Functor&& func, Args&&... args)
-{
-    basic_executor& executor = context.get_executor();
-
-    if (executor.stopped())
-        throw std::system_error(std::make_error_code(std::errc::operation_not_permitted), "Context executor is stopped");
-
-    auto taskPtr = std::make_shared<detail::binder<Functor, Args...>>
-                        (std::forward<Functor>(func), std::forward<Args>(args)...);
-
-    executor.post(detail::priority_job(prio, [taskPtr](void) { return (*taskPtr)(); }));
-
-    // Return the future of the job's result
-    return taskPtr->get_future();
-}
+std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& context, priority prio, Functor&& func, Args&&... args);
 
 
 /**
  * @brief Overloaded variant with medium priority
  */
 template<class Functor, class... Args>
-std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& context, Functor&& func, Args&&... args)
-{
-    return post(context, priority::medium, std::forward<Functor>(func), std::forward<Args>(args)...);
-}
+std::future<std::invoke_result_t<Functor, Args...>> post(execution_context& context, Functor&& func, Args&&... args);
 
 
 SYNC_END
+
+#include "sync/detail/impl/execution_context.ipp"
 
 #endif  // SYNC_EXECUTION_CONTEXT_HPP

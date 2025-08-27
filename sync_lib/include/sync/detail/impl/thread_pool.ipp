@@ -12,6 +12,7 @@ thread_pool::thread_pool(size_t nthreads)
     _SYNC_ASSERT(nthreads > 0, "Pool cannot have 0 threads!");
 
     _scheduler.restart();
+    _scheduler.allow_wait();
     _threads.reserve(nthreads);
 
     while (nthreads--)
@@ -54,7 +55,8 @@ bool thread_pool::stopped() const
 
 void thread_pool::stop()
 {
-    _scheduler.stop_now();
+    _scheduler.stop();
+    _scheduler.forbid_wait();
 }
 
 

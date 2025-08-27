@@ -7,6 +7,19 @@
 SYNC_BEGIN
 
 
+task_context::task_context()
+{
+    _scheduler.restart();
+    _scheduler.forbid_wait();
+}
+
+
+task_context::~task_context()
+{
+    // Empty - scheduler stops by default
+}
+
+
 basic_executor& task_context::get_executor()
 {
     return _scheduler;
@@ -33,7 +46,7 @@ void task_context::run()
 
 void task_context::stop()
 {
-    _scheduler.stop_now();
+    _scheduler.stop();
 }
 
 

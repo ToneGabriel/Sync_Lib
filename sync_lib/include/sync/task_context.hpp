@@ -18,9 +18,9 @@ private:
 
 public:
 
-    SYNC_DECL task_context() = default;
+    SYNC_DECL task_context();
 
-    SYNC_DECL ~task_context() override = default;
+    SYNC_DECL ~task_context() override;
 
 public:
 

@@ -35,6 +35,9 @@ private:
     // Flag used for stop state
     bool _stop = false;
 
+    // Flag used to allow waiting for jobs
+    bool _wait = false;
+
 public:
 
     scheduler() = default;
@@ -59,22 +62,31 @@ public:
     SYNC_DECL size_t jobs_done() const;
 
     /**
-     * @brief Stop the executor. Pending jobs finish before return.
+     * @brief Stop the executor. Pending jobs finish before return if `allowed_wait()` was called.
+     * Running jobs will continue.
      * Subsequent `run()` calls return immediately.
      */
     SYNC_DECL void stop();
 
     /**
-     * @brief Stop the executor. Pending jobs are no longer available.
-     * Running jobs will continue.
-     * Subsequent `run()` calls return immediately.
-     */
-    SYNC_DECL void stop_now();
-
-    /**
      * @brief Allow new calls for `run()`
      */
     SYNC_DECL void restart();
+
+    /**
+     * @brief Returns `true` if the executor can wait for new jobs if none pending, `false` otherwise.
+     */
+    SYNC_DECL bool allowed_to_wait() const;
+
+    /**
+     * @brief Threads executing `run()` are allowed to wait for new jobs if not stopped
+     */
+    SYNC_DECL void allow_wait();
+
+    /**
+     * @brief Threads executing `run()` exit if stopped or no jobs left
+     */
+    SYNC_DECL void forbid_wait();
 
     /**
      * @brief Start tasks
