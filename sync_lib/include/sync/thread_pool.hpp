@@ -31,58 +31,59 @@ public:
     /**
      * @brief Construct thread_pool with default number of threads `std::thread::hardware_concurrency()`
      */
-    thread_pool()
+    SYNC_DECL thread_pool()
         : thread_pool(std::thread::hardware_concurrency()) { /* Empty */ }
 
     /**
      * @brief Construct thread_pool with specified number of threads
      * @param nthreads number of threads
      */
-    thread_pool(size_t nthreads);
+    SYNC_DECL thread_pool(size_t nthreads);
 
     /**
      * @brief Calls `join()` before destroying the object
      */
-    ~thread_pool() override;
+    SYNC_DECL ~thread_pool() override;
 
 public:
 
     /**
      * @brief Return a reference to the executor associated with the pool
      */
-    basic_executor& get_executor() override;
+    SYNC_DECL basic_executor& get_executor() override;
 
     /**
      * @brief Return the number of running threads
      */
-    size_t thread_count() const;
+    SYNC_DECL size_t thread_count() const;
 
     /**
      * @brief Return the number of tasks finished (even if they throw)
      */
-    size_t jobs_done() const;
+    SYNC_DECL size_t jobs_done() const;
 
     /**
      * @brief Returns `true` if the executor is stopped, `false` otherwise.
      */
-    bool stopped() const;
+    SYNC_DECL bool stopped() const;
 
     /**
      * @brief Stop the executor (non-blocking). Pending jobs are no longer available.
      * Running jobs will continue.
      */
-    void stop();
+    SYNC_DECL void stop();
 
     /**
      * @brief Block until all pending jobs are finished, then join threads.
      */
-    void join();
+    SYNC_DECL void join();
 };  // END thread_pool
 
 
 SYNC_END
 
-
-#include "sync/detail/impl/thread_pool.ipp"
+#ifdef SYNC_HEADER_ONLY
+#   include "sync/detail/impl/thread_pool.ipp"
+#endif  // SYNC_HEADER_ONLY
 
 #endif  // SYNC_THREAD_POOL_HPP

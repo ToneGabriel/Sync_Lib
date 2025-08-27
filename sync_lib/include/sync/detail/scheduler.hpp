@@ -39,55 +39,55 @@ public:
 
     scheduler() = default;
 
-    ~scheduler() override;
+    SYNC_DECL ~scheduler() override;
 
 public:
 
     /**
      * @brief Used internally by `sync::post()` to submit tasks
      */
-    void post(detail::priority_job&& job) override;
+    SYNC_DECL void post(detail::priority_job&& job) override;
 
     /**
      * @brief Returns `true` if the executor is stopped, `false` otherwise.
      */
-    bool stopped() const override;
+    SYNC_DECL bool stopped() const override;
 
     /**
      * @brief Return the number of tasks finished (even if they throw)
      */
-    size_t jobs_done() const;
+    SYNC_DECL size_t jobs_done() const;
 
     /**
      * @brief Stop the executor. Pending jobs finish before return.
      * Subsequent `run()` calls return immediately.
      */
-    void stop();
+    SYNC_DECL void stop();
 
     /**
      * @brief Stop the executor. Pending jobs are no longer available.
      * Running jobs will continue.
      * Subsequent `run()` calls return immediately.
      */
-    void stop_now();
+    SYNC_DECL void stop_now();
 
     /**
      * @brief Allow new calls for `run()`
      */
-    void restart();
+    SYNC_DECL void restart();
 
     /**
      * @brief Start tasks
      */
-    void run();
+    SYNC_DECL void run();
 };  // END scheduler
 
 
 DETAIL_END
 SYNC_END
 
-
-#include "sync/detail/impl/scheduler.ipp"
-
+#ifdef SYNC_HEADER_ONLY
+#   include "sync/detail/impl/scheduler.ipp"
+#endif  // SYNC_HEADER_ONLY
 
 #endif  // SYNC_DETAIL_SCHEDULER_HPP

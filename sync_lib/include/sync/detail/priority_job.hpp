@@ -52,7 +52,7 @@ public:
      * @brief Constructor that sets priority and job for this object
      * @note Job ownership is transfered
      */
-    priority_job(priority prio, std::function<void(void)>&& job)
+    SYNC_DECL priority_job(priority prio, std::function<void(void)>&& job)
         :   _prio(prio),
             _job(std::move(job)),
             _timestamp(std::chrono::steady_clock::now()) { /* Empty */ }
@@ -63,21 +63,21 @@ public:
     priority_job(const priority_job&)             = delete;
     priority_job& operator=(const priority_job&)  = delete;
 
-    priority_job(priority_job&& other) noexcept;
-    priority_job& operator=(priority_job&& other) noexcept;
+    SYNC_DECL priority_job(priority_job&& other) noexcept;
+    SYNC_DECL priority_job& operator=(priority_job&& other) noexcept;
 
 public:
 
     /**
      * @brief Call the stored job if any
      */
-    void operator()(void) const;
+    SYNC_DECL void operator()(void) const;
 
     /**
      * @brief Number used by `operator<` for comparison in `std::priority_queue`
      * @note Priority might be higher than the original due to wait time
      */
-    uint8_t effective_priority() const;
+    SYNC_DECL uint8_t effective_priority() const;
 
 private:
 
@@ -85,7 +85,7 @@ private:
      * @brief Ownership transfer algorithm
      * @param other object from where to get data
      */
-    void _move(priority_job&& other) noexcept;
+    SYNC_DECL void _move(priority_job&& other) noexcept;
 };  // END priority_job
 
 
@@ -103,8 +103,8 @@ inline bool operator<(const priority_job& left, const priority_job& right)
 DETAIL_END
 SYNC_END
 
-
-#include "sync/detail/impl/priority_job.ipp"
-
+#ifdef SYNC_HEADER_ONLY
+#   include "sync/detail/impl/priority_job.ipp"
+#endif  // SYNC_HEADER_ONLY
 
 #endif  // SYNC_DETAIL_PRIORITY_JOB_HPP
