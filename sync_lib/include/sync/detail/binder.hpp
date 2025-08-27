@@ -1,12 +1,15 @@
-#pragma once
+#ifndef SYNC_DETAIL_BINDER_HPP
+#define SYNC_DETAIL_BINDER_HPP
 
 #include <functional>
 #include <future>
 
-#include "sync/_sync_core.h"
+#include "sync/detail/core.hpp"
 
 
 SYNC_BEGIN
+DETAIL_BEGIN
+
 
 /**
  * @brief Class to store a functor and its arguments
@@ -17,25 +20,19 @@ template<class Functor, class... Args>
 class binder
 {
 public:
-    /**
-     * @brief Type of the return value from call
-     */
+
+    // Type of the return value from call
     using return_type = std::invoke_result_t<Functor, Args...>;
 
 private:
-    /**
-     * @brief Stored functor
-     */
+
+    // Stored functor
     std::decay_t<Functor> _functor;
 
-    /**
-     * @brief Stored arguments as tuple
-     */
+    // Stored arguments as tuple
     std::tuple<std::decay_t<Args>...> _boundArgs;
 
-    /**
-     * @brief Promise to get future later with the result
-     */
+    // Promise to get future later with the result
     std::promise<return_type> _promise;
 
 public:
@@ -64,32 +61,19 @@ public:
      * @brief Perform call `func(args...)`
      * @note Call `get_future()` to get the `std::future` object for call result
      */
-    void operator()(void) noexcept(noexcept(std::apply(_functor, _boundArgs)))
-    {
-        try
-        {
-            if constexpr (std::is_void_v<return_type>)
-            {
-                std::apply(_functor, _boundArgs);
-                _promise.set_value();
-            }
-            else
-                _promise.set_value(std::apply(_functor, _boundArgs));
-        }
-        catch(...)
-        {
-            _promise.set_exception(std::current_exception());
-        }
-    }
+    void operator()(void) noexcept(noexcept(std::apply(_functor, _boundArgs)));
 
     /**
      * @brief Get the future object
      * @return `std::future<return_type>`
      */
-    std::future<return_type> get_future()
-    {
-        return _promise.get_future();
-    }
+    std::future<return_type> get_future();
 };  // END binder
 
+
+DETAIL_END
 SYNC_END
+
+#include "sync/detail/impl/binder.ipp"
+
+#endif  // SYNC_DETAIL_BINDER_HPP

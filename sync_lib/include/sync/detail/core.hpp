@@ -1,4 +1,5 @@
-#pragma once
+#ifndef SYNC_DETAIL_CORE_HPP
+#define SYNC_DETAIL_CORE_HPP
 
 #include <cstddef>      // size_t, nullptr_t
 #include <stdexcept>    // exceptions
@@ -22,12 +23,28 @@ inline void __Assert(bool expr, const char* msg, const char* expected, const cha
     }
 }
 
-#define _ASSERT(Expr, Msg) __Assert(Expr, Msg, #Expr, __FILE__, __LINE__)
+#ifndef NDEBUG
+#   define _SYNC_ASSERT(Expr, Msg) __Assert(Expr, Msg, #Expr, __FILE__, __LINE__)
+#else
+#   define _SYNC_ASSERT(Expr, Msg) ((void)0)
+#endif
 
-#define RERAISE throw    // used to terminate in a catch block
+
+#define SYNC_HEADER_ONLY 1  // may change in the future
+
+#ifdef SYNC_HEADER_ONLY
+#   define SYNC_DECL inline
+#endif  // #ifdef SYNC_HEADER_ONLY
+
+// If SYNC_DECL isn't defined yet, define it now.
+#ifndef SYNC_DECL
+# define SYNC_DECL
+#endif // !defined(SYNC_DECL)
 
 #define DETAIL_BEGIN namespace detail {
 #define DETAIL_END }
 
 #define SYNC_BEGIN namespace sync {
 #define SYNC_END }
+
+#endif  // SYNC_DETAIL_CORE_HPP
