@@ -81,26 +81,14 @@ void scheduler::run()
         {   // Empty scope start -> mutex lock and job decision
             std::unique_lock<std::mutex> lock(_pendingJobsMtx);
 
-            if (_wait)  // Can wait for work if not stopped and queue is empty
-            {
-                // Pool is working (not stoped), but there are no jobs -> wait
-                if (!_stop && _pendingJobs.empty())
-                    _pendingJobsCV.wait(lock);
+            if (!_stop && _wait && _pendingJobs.empty())
+                _pendingJobsCV.wait(lock);
 
-                // Wait was disabled. Go to else branch
-                if (!_wait)
-                    continue;
+            if (!_wait && (_stop || _pendingJobs.empty()))
+                return;
 
-                // Pool is stoped
-                // Threads finish pending jobs first
-                if (_pendingJobs.empty())
-                    return;
-            }
-            else    // Exit if stopped or there are no jobs left
-            {
-                if (_stop || _pendingJobs.empty())
-                    return;
-            }
+            if (_stop && _pendingJobs.empty())
+                return;
 
             job = std::move(const_cast<detail::priority_job&>(_pendingJobs.top()));
             _pendingJobs.pop();
