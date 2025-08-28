@@ -84,8 +84,7 @@ void scheduler::run()
             if (_wait)  // Can wait for work if not stopped and queue is empty
             {
                 // Pool is working (not stoped), but there are no jobs -> wait
-                // Safeguard against spurious wakeups (while instead of if)
-                while (!_stop && _pendingJobs.empty())
+                if (!_stop && _pendingJobs.empty())
                     _pendingJobsCV.wait(lock);
 
                 // Wait was disabled. Go to else branch
