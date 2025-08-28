@@ -1,6 +1,6 @@
 # Sync
 
-**Version 1.0.0-beta**
+**Version 1.0.1-beta**
 
 **Sync** is a lightweight, header-only C++ library providing concurrency utilities with a design inspired by `boost::asio::thread_pool` and `io_context`.   
 It offers a simple yet efficient foundation for multithreading through two main components:

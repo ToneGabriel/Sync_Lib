@@ -17,6 +17,13 @@ SYNC_BEGIN
 DETAIL_BEGIN
 
 
+/**
+ * @brief Basic task executor with priority ordering. `run()` can be called from multiple threads to execute pending jobs
+ * @note If allowed to wait, not stopped and no pending jobs -> wait
+ * @note If allowed to wait, stopped -> don't accept new jobs, execute all pending jobs
+ * @note If not allowed to wait, not stopped -> accept new jobs, execute all pending jobs
+ * @note If not allowed to wait, stopped -> don't accept new jobs, don't execute pending jobs
+ */
 class scheduler : public basic_executor
 {
 private:
