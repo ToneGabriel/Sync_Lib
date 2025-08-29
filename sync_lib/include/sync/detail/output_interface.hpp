@@ -3,6 +3,9 @@
 #include <type_traits>
 #include <memory>
 
+#include "sync/detail/core.hpp"
+
+SYNC_BEGIN
 
 class output_interface
 {
@@ -20,17 +23,16 @@ template<class OutObject>
 class output_impl final : public output_interface
 {
 private:
-    OutObject* _outObject = nullptr;
+    std::reference_wrapper<OutObject> _outObjectRef;
 
 public:
-    template<class OtherOutObject,
-    std::enable_if_t<!std::is_same_v<std::decay_t<OtherOutObject>, output_impl>, bool> = true>
-    explicit output_impl(OtherOutObject&& val)
-        : _outObject(&static_cast<OtherOutObject&&>(val)) { /*Empty*/ }
+    template<class OtherOutObject, std::enable_if_t<!std::is_same_v<std::decay_t<OtherOutObject>, output_impl>, bool> = true>
+    explicit output_impl(OtherOutObject& val) noexcept
+        : _outObjectRef(val) { /*Empty*/ }
 
     void write(const char* c, std::streamsize n) override
     {
-        _outObject->write(c, n);
+        _outObjectRef.get().write(c, n);
     }
 };  // END output_impl
 
@@ -44,6 +46,14 @@ public:
 
     output_wrapper() = default;
     ~output_wrapper() = default;
+
+    // disable copy
+    output_wrapper(const output_wrapper&) = delete;
+    output_wrapper& operator=(const output_wrapper&) = delete;
+
+    // allow move
+    output_wrapper(output_wrapper&&) noexcept = default;
+    output_wrapper& operator=(output_wrapper&&) noexcept = default;
 
     template<class OutObject, std::enable_if_t<!std::is_same_v<std::decay_t<OutObject>, output_wrapper>, bool> = true>
     output_wrapper(OutObject& val) : _storage(nullptr)
@@ -64,11 +74,9 @@ private:
     template<class OutObject>
     void _reset(OutObject& val)
     {
-        // if (!detail::_test_callable(val))   // null member pointer/function pointer/custom::function
-        //     return;                 // already empty
-
         using _OtherImpl = output_impl<std::decay_t<OutObject>>;
-        _storage.reset(new _OtherImpl(val));
+        _storage = std::make_unique<_OtherImpl>(val);
     }
-
 };  // END output_wrapper
+
+SYNC_END

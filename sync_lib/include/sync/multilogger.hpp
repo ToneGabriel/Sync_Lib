@@ -7,6 +7,8 @@
 #include "sync/detail/output_interface.hpp"
 
 
+SYNC_BEGIN
+
 class multilogger
 {
 private:
@@ -29,10 +31,10 @@ public:
 public:
 
     template<class OutObject>
-    void add(OutObject& stream)
+    void add(OutObject& obj)
     {
         std::lock_guard lock(_mtx);
-        _loggers.emplace(output_wrapper(stream));
+        _loggers.push_back(output_wrapper(obj));
     }
 
     void clear()
@@ -52,9 +54,19 @@ public:
         std::lock_guard lock(_mtx);
 
         for (auto& lg : _loggers)
-            lg.write(c, n);
+        {
+            try
+            {
+                lg.write(c, n);
+            }
+            catch(...)
+            {
+                // TODO
+            }       
+        }
     }
 };  // END multilogger
 
+SYNC_END
 
 #endif  // SYNC_MULTILOGGER_HPP
