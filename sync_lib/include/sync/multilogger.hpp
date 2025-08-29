@@ -4,15 +4,16 @@
 #include <mutex>
 #include <vector>
 
-#include "sync/detail/output_interface.hpp"
+#include "sync/detail/output_stream.hpp"
 
 
 SYNC_BEGIN
 
+
 class multilogger
 {
 private:
-    std::vector<output_wrapper> _loggers;
+    std::vector<detail::output_stream> _ostreams;
     mutable std::mutex _mtx;
 
 public:
@@ -30,43 +31,17 @@ public:
 
 public:
 
-    template<class OutObject>
-    void add(OutObject& obj)
-    {
-        std::lock_guard lock(_mtx);
-        _loggers.push_back(output_wrapper(obj));
-    }
+    template<class StreamType>
+    void add(StreamType& ostream);
 
-    void clear()
-    {
-        std::lock_guard lock(_mtx);
-        _loggers.clear();
-    }
-
-    bool empty() const
-    {
-        std::lock_guard lock(_mtx);
-        return _loggers.empty();
-    }
-
-    void write(const char* c, std::streamsize n)
-    {
-        std::lock_guard lock(_mtx);
-
-        for (auto& lg : _loggers)
-        {
-            try
-            {
-                lg.write(c, n);
-            }
-            catch(...)
-            {
-                // TODO
-            }       
-        }
-    }
+    void clear();
+    bool empty() const;
+    void write(const char* c, std::streamsize n);
 };  // END multilogger
 
+
 SYNC_END
+
+#include "sync/detail/impl/multilogger.ipp"
 
 #endif  // SYNC_MULTILOGGER_HPP
