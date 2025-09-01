@@ -13,11 +13,13 @@ void multilogger::add(StreamType& ostream)
     _ostreams.push_back(detail::output_stream(ostream));
 }
 
+
 void multilogger::clear()
 {
     std::lock_guard lock(_mtx);
     _ostreams.clear();
 }
+
 
 bool multilogger::empty() const
 {
@@ -25,21 +27,22 @@ bool multilogger::empty() const
     return _ostreams.empty();
 }
 
+
 void multilogger::write(const char* c, std::streamsize n)
 {
     std::lock_guard lock(_mtx);
 
-    for (auto& lg : _ostreams)
+    for (auto& ostr : _ostreams)
     {
         try
         {
-            if (lg.good())
-                lg.write(c, n).flush();
+            if (ostr.good())
+                ostr.write(c, n).flush();
         }
-        catch(...)
+        catch (const sync::detail::bad_output_stream& e)
         {
-            // TODO
-        }       
+            throw std::system_error(std::make_error_code(std::errc::io_error), e.what());
+        }    
     }
 }
 

@@ -11,8 +11,7 @@ SYNC_BEGIN
 
 
 /**
- * @brief Enum for job priority in thread_pool internal queue
- * @note Priority might change based on wait time
+ * @brief Enum for job priority in scheduler internal queue
  */
 enum class priority : uint8_t
 {

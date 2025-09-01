@@ -69,9 +69,8 @@ public:
     SYNC_DECL size_t jobs_done() const;
 
     /**
-     * @brief Stop the executor. Pending jobs finish before return if `allowed_wait()` was called.
+     * @brief Stop the executor. Pending jobs finish before return if `allow_wait()` was called.
      * Running jobs will continue.
-     * Subsequent `run()` calls return immediately.
      */
     SYNC_DECL void stop();
 
@@ -87,6 +86,7 @@ public:
 
     /**
      * @brief Threads executing `run()` are allowed to wait for new jobs if not stopped
+     * @note If stopped, the scheduler will finish pending jobs first.
      */
     SYNC_DECL void allow_wait();
 
@@ -96,7 +96,8 @@ public:
     SYNC_DECL void forbid_wait();
 
     /**
-     * @brief Start tasks
+     * @brief Start executing pending jobs
+     * @note Can be started from multiple threads
      */
     SYNC_DECL void run();
 };  // END scheduler

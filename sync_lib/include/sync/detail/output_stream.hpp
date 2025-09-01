@@ -40,12 +40,24 @@ public:
         : _ostreamRef(ostream) { /*Empty*/ }
 
     bool good() const noexcept override;
-    void write(const char* c, std::streamsize n) override;
     void flush() override;
+    void write(const char* c, std::streamsize n) override;
 };  // END output_stream_impl
 
 
 // =============================================================================================
+
+
+/**
+ * @brief Exception thrown when output_stream functions are called with empty storage
+ */
+class bad_output_stream : public std::exception
+{
+public:
+    bad_output_stream() noexcept { /*Empty*/ }
+
+    const char* what() const noexcept override { return "Bad output stream call."; }
+};  // END bad_output_stream
 
 
 class output_stream
@@ -67,20 +79,20 @@ public:
     output_stream& operator=(output_stream&&) noexcept = default;
 
     template<class OStreamType, std::enable_if_t<!std::is_same_v<std::decay_t<OStreamType>, output_stream>, bool> = true>
-    output_stream(OStreamType& ostream) : _storage(nullptr)
+    output_stream(OStreamType&& ostream) : _storage(nullptr)
     {
         _reset(ostream);
     }
 
 public:
 
-    bool good() const noexcept;
-    output_stream& write(const char* c, std::streamsize n);
+    bool good() const;
     output_stream& flush();
+    output_stream& write(const char* c, std::streamsize n);
 
 private:
     template<class OStreamType>
-    void _reset(OStreamType& ostream);
+    void _reset(OStreamType&& ostream);
 };  // END output_stream
 
 
