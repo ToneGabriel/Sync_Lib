@@ -1,12 +1,13 @@
 # Sync
 
-**Version 1.0.1-beta**
+**Version 1.1.0-beta**
 
-**Sync** is a lightweight, header-only C++ library providing concurrency utilities with a design inspired by `boost::asio::thread_pool` and `io_context`.   
-It offers a simple yet efficient foundation for multithreading through two main components:
+**Sync** is a lightweight, header-only C++ library providing concurrency utilities with a design inspired by `boost::asio` library.   
+It offers a simple yet efficient foundation for multithreading through the main components:
 
 - **thread_pool**: A scalable pool for executing tasks in parallel.
 - **task_context**: A lightweight wrapper over the shared scheduler for task execution.
+- **multilogger**: A thread-safe logger that writes to multiple output streams at once.
 
 ---
 
@@ -21,6 +22,7 @@ It offers a simple yet efficient foundation for multithreading through two main 
 - Simple Interface – Submit tasks via `sync::post()` and let the executor handle them.
 - Priority-Based Scheduling – Scheduler uses a priority queue; tasks can be posted with custom priority levels.
 - Safe Execution – `sync::post()` returns `std::future<T>` so results or exceptions can be retrieved.
+- Safe Logs – `sync::multilogger` enables simultaneous logging to multiple output streams (including custom ones).
 - Well-tested – The project includes unit tests and builds the corresponding test executables.
 
 </details>

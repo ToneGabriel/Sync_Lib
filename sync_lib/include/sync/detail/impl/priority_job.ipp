@@ -25,8 +25,7 @@ priority_job& priority_job::operator=(priority_job&& other) noexcept
 
 void priority_job::operator()(void) const
 {
-    if (_job)
-        _job();
+    _job();
 }
 
 
