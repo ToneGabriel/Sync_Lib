@@ -1,6 +1,7 @@
 DONE - Fix detail::scheduler::run() to stop if no work is available
 DONE - Check task_context_test.cpp to verify test implementation
 DONE - Fix duplicate definitions
+DONE - Update README.md with new multilogger
 
 1. Add comments where they miss.
 2. Add proper documentation.
