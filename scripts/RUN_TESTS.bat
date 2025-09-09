@@ -9,7 +9,7 @@ echo.
 echo Building and running tests...
 echo.
 cmake -G "Ninja" -S "%ROOT_DIR%" -B "%BUILD_DIR%"
-cmake --build "%BUILD_DIR%"
+cmake --build "%BUILD_DIR%" -j4
 ctest --test-dir "%BUILD_DIR%"
 
 pause
