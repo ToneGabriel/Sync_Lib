@@ -1,6 +1,6 @@
 # Sync
 
-**Version 1.1.2-beta**
+**Version 1.1.3-beta**
 
 **Sync** is a lightweight, header-only C++ library providing concurrency utilities with a design inspired by `boost::asio` library.   
 It offers a simple yet efficient foundation for multithreading through the main components:
@@ -101,4 +101,4 @@ ctest --test-dir build
 ```
 
 Or simply run the script `scripts/RUN_TESTS` and the build is done automatically.   
-The results can be found in `logs/tests` folder.
+The results can be found in `build/Testing/Temporary` folder.

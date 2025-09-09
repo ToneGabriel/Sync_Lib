@@ -1,14 +1,13 @@
 enable_testing()
-set(SCRIPTS_PATH "${CMAKE_SOURCE_DIR}/scripts")
-set(INTERNAL_SCRIPTS_PATH "${SCRIPTS_PATH}/internal")
-set(TEST_LOGS_PATH "${CMAKE_SOURCE_DIR}/logs/tests")
-file(MAKE_DIRECTORY ${TEST_LOGS_PATH})
+
+set(TEST_LOGS_PATH "${CMAKE_BINARY_DIR}/Testing/Temporary")
 
 if(WIN32)
-    set(RUN_AND_OUTPUT_SCRIPT_NAME run_and_output.bat)
+    set(_CMAKE_COMMAND_ENV "cmd.exe" "/c")
 else()
-    set(RUN_AND_OUTPUT_SCRIPT_NAME run_and_output.sh)
+    set(_CMAKE_COMMAND_ENV "sh" "-c")
 endif()
+
 
 
 function(_set_default_output_directories target)
@@ -97,9 +96,12 @@ function(create_executable exename libs)
 endfunction()
 
 
+# create_ctest(exename)
 function(create_ctest exename)
+    # exename   -> target name
+
     add_test(
         NAME ${exename}
-        COMMAND "${INTERNAL_SCRIPTS_PATH}/${RUN_AND_OUTPUT_SCRIPT_NAME}" $<TARGET_FILE:${exename}> "${TEST_LOGS_PATH}/${exename}.log"
+        COMMAND ${CMAKE_COMMAND} -E env ${_CMAKE_COMMAND_ENV} "$<TARGET_FILE:${exename}> > ${TEST_LOGS_PATH}/${exename}.log 2>&1"
     )
 endfunction()
