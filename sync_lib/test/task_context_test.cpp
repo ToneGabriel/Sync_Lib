@@ -6,20 +6,20 @@
 
 // Members tests
 // ===========================================================
-class TaskContextFixture : public ::testing::Test
+class SyncTaskContext_Operations : public ::testing::Test
 {
 protected:
     sync::task_context _task_context_instance;
-};  // END TaskContextFixture
+};  // END SyncTaskContext_Operations
 
 
-TEST_F(TaskContextFixture, stopped)
+TEST_F(SyncTaskContext_Operations, stopped)
 {
     EXPECT_FALSE(this->_task_context_instance.stopped());
 }
 
 
-TEST_F(TaskContextFixture, stop)
+TEST_F(SyncTaskContext_Operations, stop)
 {
     EXPECT_FALSE(this->_task_context_instance.stopped());
     this->_task_context_instance.stop();
@@ -27,7 +27,7 @@ TEST_F(TaskContextFixture, stop)
 }
 
 
-TEST_F(TaskContextFixture, restart)
+TEST_F(SyncTaskContext_Operations, restart)
 {
     EXPECT_FALSE(this->_task_context_instance.stopped());
     this->_task_context_instance.stop();
@@ -37,7 +37,7 @@ TEST_F(TaskContextFixture, restart)
 }
 
 
-TEST_F(TaskContextFixture, post_and_run)
+TEST_F(SyncTaskContext_Operations, post_and_run)
 {
     std::vector<std::string> expected_order = {"highest", "high", "medium", "low", "lowest"};
     std::vector<std::string> execution_order;
