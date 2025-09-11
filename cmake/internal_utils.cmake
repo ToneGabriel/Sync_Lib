@@ -1,11 +1,11 @@
 enable_testing()
 
-set(TEST_LOGS_PATH "${CMAKE_BINARY_DIR}/Testing/Temporary")
+set(_TEST_LOGS_PATH "${CMAKE_BINARY_DIR}/Testing/Temporary")
 
 if(WIN32)
-    set(_CMAKE_COMMAND_ENV "cmd.exe" "/c")
+    set(_CMAKE_COMMAND_ENV "-E" "env" "cmd.exe" "/c")
 else()
-    set(_CMAKE_COMMAND_ENV "sh" "-c")
+    set(_CMAKE_COMMAND_ENV "-E" "env" "sh" "-c")
 endif()
 
 
@@ -31,7 +31,7 @@ function(_create_language_compile_feature_name lang std out_std_keyword)
 endfunction()
 
 
-# create_library(libname, libtype, lang, std, defs, incs)
+# create_library(libname libtype lang std defs incs)
 # defs - "VAR1=3;VAR2;VAR3=\"str\""
 # incs - "path1;path2"
 function(create_interface_library libname lang std defs incs)
@@ -52,7 +52,7 @@ function(create_interface_library libname lang std defs incs)
 endfunction()
 
 
-# create_library(libname, libtype, lang, std, defs, incs, srcs...)
+# create_library(libname libtype lang std defs incs srcs...)
 # defs - "VAR1=3;VAR2;VAR3=\"str\""
 # incs - "path1;path2"
 function(create_library libname libtype lang std defs incs)
@@ -83,25 +83,44 @@ function(create_library libname libtype lang std defs incs)
 endfunction()
 
 
-# create_executable(exename, libs, src...)
+# create_executable(exename defs libs src...)
+# defs - "VAR1=3;VAR2;VAR3=\"str\""
 # libs - "lib1;lib2;..."
-function(create_executable exename libs)
+function(create_executable exename defs libs)
     # exename   -> target name
+    # defs      -> list of compile definitions
     # libs      -> list of library names
     # ${ARGN}   -> source files
 
     add_executable(${exename} ${ARGN})
     _set_default_output_directories(${exename})
+    target_compile_definitions(${exename} PRIVATE ${defs})
     target_link_libraries(${exename} PRIVATE ${libs})
 endfunction()
 
 
-# create_ctest(exename)
-function(create_ctest exename)
+# create_ctest(testname exename flags...)
+function(create_ctest testname exename)
+    # testname  -> test name
     # exename   -> target name
+    # ${ARGN}   -> exe flags
+
+    if("${testname}" STREQUAL "")
+        set(testname "${exename}")
+    endif()
 
     add_test(
-        NAME ${exename}
-        COMMAND ${CMAKE_COMMAND} -E env ${_CMAKE_COMMAND_ENV} "$<TARGET_FILE:${exename}> > ${TEST_LOGS_PATH}/${exename}.log 2>&1"
+        NAME ${testname}
+        COMMAND ${CMAKE_COMMAND} ${_CMAKE_COMMAND_ENV} "$<TARGET_FILE:${exename}> ${ARGN} > ${_TEST_LOGS_PATH}/${testname}.log 2>&1"
     )
+endfunction()
+
+
+# create_ctest_suite(exenames...)
+function(create_ctest_suite)
+    # ${ARGN}   -> targe names
+
+    foreach(exe IN LISTS ARGN)
+        create_ctest("" ${exe})
+    endforeach()
 endfunction()

@@ -8,7 +8,7 @@
 #include "sync/multilogger.hpp"
 
 
-class MultiloggerFixture : public ::testing::Test
+class SyncMultilogger_Operations : public ::testing::Test
 {
 protected:
     sync::multilogger   _multilogger_instance;
@@ -26,16 +26,16 @@ protected:
     {
         _multilogger_instance.clear();
     }
-};  // END MultiloggerFixture
+};  // END SyncMultilogger_Operations
 
 
-TEST_F(MultiloggerFixture, empty)
+TEST_F(SyncMultilogger_Operations, empty)
 {
     EXPECT_FALSE(this->_multilogger_instance.empty());
 }
 
 
-TEST_F(MultiloggerFixture, add)
+TEST_F(SyncMultilogger_Operations, add)
 {
     this->_multilogger_instance.clear();
     EXPECT_TRUE(this->_multilogger_instance.empty());
@@ -45,7 +45,7 @@ TEST_F(MultiloggerFixture, add)
 }
 
 
-TEST_F(MultiloggerFixture, clear)
+TEST_F(SyncMultilogger_Operations, clear)
 {
     EXPECT_FALSE(this->_multilogger_instance.empty());
 
@@ -59,7 +59,7 @@ TEST_F(MultiloggerFixture, clear)
 }
 
 
-TEST_F(MultiloggerFixture, write_to_valid_ostreams)
+TEST_F(SyncMultilogger_Operations, write_to_valid_ostreams)
 {
     const std::string str = "Hello, Logger!";
 
@@ -69,7 +69,7 @@ TEST_F(MultiloggerFixture, write_to_valid_ostreams)
 }
 
 
-TEST_F(MultiloggerFixture, write_to_invalid_ostreams)
+TEST_F(SyncMultilogger_Operations, write_to_invalid_ostreams)
 {
     const std::string str = "Hello, Logger!";
 
@@ -80,7 +80,7 @@ TEST_F(MultiloggerFixture, write_to_invalid_ostreams)
 }
 
 
-TEST_F(MultiloggerFixture, skip_error_streams)
+TEST_F(SyncMultilogger_Operations, skip_error_streams)
 {
     this->_osstream1.setstate(std::ios::failbit);   // Simulate a failed stream
     const std::string str = "Hello, Logger!";
@@ -91,7 +91,7 @@ TEST_F(MultiloggerFixture, skip_error_streams)
 }
 
 
-TEST_F(MultiloggerFixture, multi_thread_output)
+TEST_F(SyncMultilogger_Operations, multi_thread_output)
 {
     auto write_to_logger =  [this](const std::string& message)
                             {

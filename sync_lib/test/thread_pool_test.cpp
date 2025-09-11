@@ -20,14 +20,14 @@ void _test_throw_std_out_of_range_exception()
 
 // Constructor tests
 // ===========================================================
-TEST(ThreadPoolConstructor, default_constructor)
+TEST(SyncThreadPool_Construct, default_constructor)
 {
     sync::thread_pool tp;
     EXPECT_EQ(tp.thread_count(), std::thread::hardware_concurrency());
 }
 
 
-TEST(ThreadPoolConstructor, thread_count_constructor)
+TEST(SyncThreadPool_Construct, thread_count_constructor)
 {
     sync::thread_pool tp(5);
     EXPECT_EQ(tp.thread_count(), 5);
@@ -36,19 +36,19 @@ TEST(ThreadPoolConstructor, thread_count_constructor)
 
 // Members tests
 // ===========================================================
-class ThreadPoolFixture : public ::testing::Test
+class SyncThreadPool_Operations : public ::testing::Test
 {
 protected:
     sync::thread_pool _thread_pool_instance;
 
 public:
-    ThreadPoolFixture()
+    SyncThreadPool_Operations()
         : _thread_pool_instance(1) {}   // just 1 thread
 
-};  // END ThreadPoolFixture
+};  // END SyncThreadPool_Operations
 
 
-TEST_F(ThreadPoolFixture, post)
+TEST_F(SyncThreadPool_Operations, post)
 {
     auto no_except_result = sync::post(this->_thread_pool_instance, _test_no_return_no_except);
     auto exception_result = sync::post(this->_thread_pool_instance, _test_throw_std_out_of_range_exception);
@@ -58,7 +58,7 @@ TEST_F(ThreadPoolFixture, post)
 }
 
 
-TEST_F(ThreadPoolFixture, jobs_done)
+TEST_F(SyncThreadPool_Operations, jobs_done)
 {
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
@@ -70,7 +70,7 @@ TEST_F(ThreadPoolFixture, jobs_done)
 }
 
 
-TEST_F(ThreadPoolFixture, join)
+TEST_F(SyncThreadPool_Operations, join)
 {
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
 
@@ -82,7 +82,7 @@ TEST_F(ThreadPoolFixture, join)
 }
 
 
-TEST_F(ThreadPoolFixture, stop)
+TEST_F(SyncThreadPool_Operations, stop)
 {
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
     (void)sync::post(this->_thread_pool_instance, _test_no_return_no_except);
